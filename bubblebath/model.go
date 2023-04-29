@@ -46,8 +46,8 @@ type bubbleBathModel struct {
 func NewBubbleBathModel(app components.Component, options ...BubbleBathOption) tea.Model {
 	appBox := flexbox.New().SetChildren([]flexbox.FlexboxItem{
 		flexbox.NewItem(app).
-			SetMinWidth(flexbox.MinContent).
-			SetMaxWidth(flexbox.MaxAvailable),
+			SetMinWidth(flexbox.MinContentWidth).
+			SetMaxWidth(flexbox.MaxAvailableWidth),
 	})
 	result := &bubbleBathModel{
 		initCmd:         nil,

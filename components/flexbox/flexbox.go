@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mieubrisse/box-layout-test/utilities"
+	"math"
 	"strings"
 )
 
@@ -28,6 +29,8 @@ const (
 type Flexbox struct {
 	children []FlexboxItem
 
+	// TODO cache content widths so we don't have to burn a bunch of energy recalculating them!
+
 	// TODO make configurable on left and right
 	padding uint
 
@@ -35,8 +38,6 @@ type Flexbox struct {
 	border lipgloss.Border
 
 	horizontalJustify HorizontalJustify
-
-	// TODO put a cache that caches the ContentWidths in between the GetContentWidth and View step
 }
 
 func New() *Flexbox {
@@ -100,7 +101,7 @@ func (b Flexbox) View(width uint) string {
 
 	// First, add up the total size the items would like
 	minChildSizeDesired := uint(0) // Under this value, the flexbox will simply truncate
-	maxChildSizeDesired := uint(0) // Above this value, only the MaxAvailable items will expand
+	maxChildSizeDesired := uint(0) // Above this value, only the MaxAvailableWidth items will expand
 	childSizes := make([]uint, numChildren)
 	maxChildSizes := make([]uint, numChildren)
 	for idx, item := range b.children {
@@ -130,11 +131,11 @@ func (b Flexbox) View(width uint) string {
 		childSizes = addSpaceByWeight(spaceToDistributeEvenly, childSizes, weights)
 	}
 
-	// When width > max_desired_size, continue to scale only the elements whose max size is MaxAvailable
+	// When width > max_desired_size, continue to scale only the elements whose max size is MaxAvailableWidth
 	if spaceAvailableForChildren > maxChildSizeDesired {
 		weights := make([]uint, numChildren)
 		for idx, item := range b.children {
-			if item.GetMaxWidth() == MaxAvailable {
+			if item.GetMaxWidth().shouldGrow {
 				// TODO use actual weights
 				weights[idx] = 1
 				continue
@@ -160,9 +161,9 @@ func (b Flexbox) View(width uint) string {
 		case Wrap:
 			widthWhenRendering = childWidth
 		case Truncate:
-			// If truncating, the child will _think_ they have the full space available
+			// If truncating, the child will _think_ they have infinite space available
 			// and then we'll truncate them later
-			widthWhenRendering = maxChildSizes[idx]
+			widthWhenRendering = math.MaxUint
 		default:
 			panic(fmt.Sprintf("Unknown item overflow style: %v", item.GetOverflowStyle()))
 		}
@@ -172,7 +173,7 @@ func (b Flexbox) View(width uint) string {
 		// Truncate, in case any children are over
 		childStr = lipgloss.NewStyle().MaxWidth(int(childWidth)).Render(childStr)
 
-		// Now expand, to ensure that children with MaxAvailable get expanded
+		// Now expand, to ensure that children with MaxAvailableWidth get expanded
 		padNeeded := int(childWidth) - lipgloss.Width(childStr)
 		childStr += strings.Repeat(" ", padNeeded)
 
@@ -215,23 +216,8 @@ func (b Flexbox) calculateAdditionalNonContentWidth() uint {
 func getChildSizeRangeUsingConstraints(item FlexboxItem) (min, max uint) {
 	innerMin, innerMax := item.GetComponent().GetContentWidths()
 
-	switch item.GetMinWidth() {
-	case MinContent:
-		min = innerMin
-	case MaxContent, MaxAvailable:
-		min = innerMax
-	default:
-		panic(fmt.Sprintf("Unknown minimum item width: %v", item.GetMinWidth()))
-	}
-
-	switch item.GetMaxWidth() {
-	case MinContent:
-		max = innerMin
-	case MaxContent, MaxAvailable:
-		max = innerMax
-	default:
-		panic(fmt.Sprintf("Unknown maximum item width: %v", item.GetMaxWidth()))
-	}
+	min = item.GetMinWidth().sizeRetriever(innerMin, innerMax)
+	max = item.GetMaxWidth().sizeRetriever(innerMin, innerMax)
 
 	if max < min {
 		max = min

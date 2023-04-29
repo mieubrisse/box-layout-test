@@ -4,24 +4,6 @@ import (
 	"github.com/mieubrisse/box-layout-test/components"
 )
 
-// Prebuilt constants for the child's size
-type FlexboxItemWidth int
-
-const (
-	// Indicates a width that's equal to the minimum width of the child box's content
-	MinContent FlexboxItemWidth = iota
-
-	// Indicates a width that's equal to the maximum width of the child box's content
-	MaxContent
-
-	// Indicates a width that's equal to the maximum available space for the child
-	// Behaves like MxContent, except that if there's more space available at render time than MaxContent,
-	// the child will be given extra space
-	MaxAvailable
-
-	// TODO add ways to set fixed widths!!
-)
-
 type FlexboxItem interface {
 	GetComponent() components.Component
 
@@ -40,7 +22,7 @@ type flexboxItemImpl struct {
 
 	// These determine how the item flexes
 	// This is analogous to both "flex-basis" and "flex-grow", where:
-	// - MaxAvailable indicates "flex-grow: >1" (see weight below)
+	// - MaxAvailableWidth indicates "flex-grow: >1" (see weight below)
 	// - Anything else indicates "flex-grow: 0", and sets the "flex-basis"
 	minWidth FlexboxItemWidth
 	maxWidth FlexboxItemWidth
@@ -48,14 +30,14 @@ type flexboxItemImpl struct {
 	overflowStyle OverflowStyle
 
 	// TODO weight (analogous to flex-grow)
-	// When the child size constraint is set to MaxAvailable, then this will be used
+	// When the child size constraint is set to MaxAvailableWidth, then this will be used
 }
 
 func NewItem(component components.Component) FlexboxItem {
 	return &flexboxItemImpl{
 		component:     component,
-		minWidth:      MinContent,
-		maxWidth:      MaxContent,
+		minWidth:      MinContentWidth,
+		maxWidth:      MaxContentWidth,
 		overflowStyle: Wrap,
 	}
 }

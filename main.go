@@ -17,14 +17,15 @@ func main() {
 	yourBox := flexbox.New()
 	yourBox.SetChildren([]flexbox.FlexboxItem{
 		flexbox.NewItem(text1).
-			SetMinWidth(flexbox.MaxContent).
-			SetMaxWidth(flexbox.MaxAvailable),
+			SetMinWidth(flexbox.MaxContentWidth).
+			SetMaxWidth(flexbox.MaxAvailableWidth),
 		flexbox.NewItem(text2).
-			SetMinWidth(flexbox.MaxContent).
-			SetMaxWidth(flexbox.MaxAvailable),
+			SetMinWidth(flexbox.MinContentWidth).
+			SetMaxWidth(flexbox.FixedSizeWidth(7)).
+			SetOverflowStyle(flexbox.Truncate),
 		flexbox.NewItem(text3).
-			SetMinWidth(flexbox.MaxContent).
-			SetMaxWidth(flexbox.MaxAvailable),
+			SetMinWidth(flexbox.MaxContentWidth).
+			SetMaxWidth(flexbox.MaxAvailableWidth),
 	})
 
 	if _, err := bubblebath.RunBubbleBathProgram(
