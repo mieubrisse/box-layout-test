@@ -21,7 +21,7 @@ var MinContentWidth = FlexboxItemWidth{
 // Basically, the length of the longest line
 var MaxContentWidth = FlexboxItemWidth{
 	sizeRetriever: func(min, max uint) uint {
-		return min
+		return max
 	},
 	shouldGrow: false,
 }

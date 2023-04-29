@@ -3,8 +3,8 @@ package flexbox
 import (
 	"fmt"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mieubrisse/box-layout-test/components"
 	"github.com/mieubrisse/box-layout-test/utilities"
-	"math"
 	"strings"
 )
 
@@ -24,8 +24,7 @@ const (
 	Right
 )
 
-// TODO constructor
-
+// TODO make an interface
 type Flexbox struct {
 	children []FlexboxItem
 
@@ -34,10 +33,23 @@ type Flexbox struct {
 	// TODO make configurable on left and right
 	padding uint
 
-	// TODO give border corners
 	border lipgloss.Border
 
 	horizontalJustify HorizontalJustify
+}
+
+// Convenience constructor for a box with a single element
+func NewWithContent(component components.Component, opts ...FlexboxItemOpt) *Flexbox {
+	item := NewItem(component)
+	for _, opt := range opts {
+		opt(item)
+	}
+	return NewWithContents(item)
+}
+
+// Convenience constructor for a box with multiple elements
+func NewWithContents(items ...FlexboxItem) *Flexbox {
+	return New().SetChildren(items)
 }
 
 func New() *Flexbox {
@@ -75,7 +87,8 @@ func (b Flexbox) GetContentWidths() (min, max uint) {
 
 	var allChildrenMin, allChildrenMax uint
 	for _, item := range b.children {
-		childMin, childMax := getChildSizeRangeUsingConstraints(item)
+		contentMin, contentMax := item.GetComponent().GetContentWidths()
+		childMin, childMax := constrainItemContentSizes(contentMin, contentMax, item)
 		allChildrenMin = utilities.GetMaxUint(allChildrenMin, childMin)
 		allChildrenMax = utilities.GetMaxUint(allChildrenMax, childMax)
 	}
@@ -100,39 +113,42 @@ func (b Flexbox) View(width uint) string {
 	numChildren := len(b.children)
 
 	// First, add up the total size the items would like
-	minChildSizeDesired := uint(0) // Under this value, the flexbox will simply truncate
-	maxChildSizeDesired := uint(0) // Above this value, only the MaxAvailableWidth items will expand
+	totalMinSizeDesired := uint(0) // Under this value, the flexbox will simply truncate
+	totalMaxSizeDesired := uint(0) // Above this value, only the MaxAvailableWidth items will expand
 	childSizes := make([]uint, numChildren)
-	maxChildSizes := make([]uint, numChildren)
+	maxConstrainedChildSizes := make([]uint, numChildren)
+	contentMaxes := make([]uint, numChildren)
 	for idx, item := range b.children {
-		childMin, childMax := getChildSizeRangeUsingConstraints(item)
-		minChildSizeDesired += childMin
-		maxChildSizeDesired += childMax
+		contentMin, contentMax := item.GetComponent().GetContentWidths()
+		contrainedMin, contrainedMax := constrainItemContentSizes(contentMin, contentMax, item)
+		totalMinSizeDesired += contrainedMin
+		totalMaxSizeDesired += contrainedMax
 
-		childSizes[idx] = childMin
-		maxChildSizes[idx] = childMax
+		contentMaxes[idx] = contentMax
+		childSizes[idx] = contrainedMin
+		maxConstrainedChildSizes[idx] = contrainedMax
 	}
 
 	// When min_desired_size < space_available < max_desired_size, scale everyone up equally between their
 	// min and max sizes
-	if spaceAvailableForChildren > minChildSizeDesired {
+	if spaceAvailableForChildren > totalMinSizeDesired {
 		weights := make([]uint, numChildren)
 		for idx, minChildSize := range childSizes {
-			maxChildSize := maxChildSizes[idx]
+			maxChildSize := maxConstrainedChildSizes[idx]
 			childExpansionRange := maxChildSize - minChildSize
 			weights[idx] = childExpansionRange
 		}
 
 		spaceToDistributeEvenly := utilities.GetMinUint(
-			spaceAvailableForChildren-minChildSizeDesired,
-			maxChildSizeDesired-minChildSizeDesired,
+			spaceAvailableForChildren-totalMinSizeDesired,
+			totalMaxSizeDesired-totalMinSizeDesired,
 		)
 
 		childSizes = addSpaceByWeight(spaceToDistributeEvenly, childSizes, weights)
 	}
 
 	// When width > max_desired_size, continue to scale only the elements whose max size is MaxAvailableWidth
-	if spaceAvailableForChildren > maxChildSizeDesired {
+	if spaceAvailableForChildren > totalMaxSizeDesired {
 		weights := make([]uint, numChildren)
 		for idx, item := range b.children {
 			if item.GetMaxWidth().shouldGrow {
@@ -144,7 +160,7 @@ func (b Flexbox) View(width uint) string {
 			weights[idx] = 0
 		}
 
-		spaceToDistributeToExpanders := spaceAvailableForChildren - maxChildSizeDesired
+		spaceToDistributeToExpanders := spaceAvailableForChildren - totalMaxSizeDesired
 
 		childSizes = addSpaceByWeight(spaceToDistributeToExpanders, childSizes, weights)
 	}
@@ -163,7 +179,7 @@ func (b Flexbox) View(width uint) string {
 		case Truncate:
 			// If truncating, the child will _think_ they have infinite space available
 			// and then we'll truncate them later
-			widthWhenRendering = math.MaxUint
+			widthWhenRendering = contentMaxes[idx]
 		default:
 			panic(fmt.Sprintf("Unknown item overflow style: %v", item.GetOverflowStyle()))
 		}
@@ -171,7 +187,10 @@ func (b Flexbox) View(width uint) string {
 		childStr := component.View(widthWhenRendering)
 
 		// Truncate, in case any children are over
-		childStr = lipgloss.NewStyle().MaxWidth(int(childWidth)).Render(childStr)
+		childStr = lipgloss.NewStyle().
+			MaxWidth(int(childWidth)).
+			MaxHeight(1).
+			Render(childStr)
 
 		// Now expand, to ensure that children with MaxAvailableWidth get expanded
 		padNeeded := int(childWidth) - lipgloss.Width(childStr)
@@ -211,19 +230,16 @@ func (b Flexbox) calculateAdditionalNonContentWidth() uint {
 	return totalNonContentWidthAdded
 }
 
-// Get the possible size ranges for the child, using the child size constraints
 // Max is guaranteed to be >= min
-func getChildSizeRangeUsingConstraints(item FlexboxItem) (min, max uint) {
-	innerMin, innerMax := item.GetComponent().GetContentWidths()
+func constrainItemContentSizes(contentMin, contentMax uint, item FlexboxItem) (constrainedMin, constrainedMax uint) {
+	constrainedMin = item.GetMinWidth().sizeRetriever(contentMin, contentMax)
+	constrainedMax = item.GetMaxWidth().sizeRetriever(contentMin, contentMax)
 
-	min = item.GetMinWidth().sizeRetriever(innerMin, innerMax)
-	max = item.GetMaxWidth().sizeRetriever(innerMin, innerMax)
-
-	if max < min {
-		max = min
+	if constrainedMax < constrainedMin {
+		constrainedMax = constrainedMin
 	}
 
-	return min, max
+	return constrainedMin, constrainedMax
 }
 
 // Distributes the space

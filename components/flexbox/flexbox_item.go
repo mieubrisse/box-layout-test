@@ -4,6 +4,27 @@ import (
 	"github.com/mieubrisse/box-layout-test/components"
 )
 
+// These are simply conveniences for the flexbox.NewWithContent , so that it's super easy to declare a single-item box
+type FlexboxItemOpt func(item FlexboxItem)
+
+func WithMinWidth(min FlexboxItemWidth) FlexboxItemOpt {
+	return func(item FlexboxItem) {
+		item.SetMinWidth(min)
+	}
+}
+
+func WithMaxWidth(max FlexboxItemWidth) FlexboxItemOpt {
+	return func(item FlexboxItem) {
+		item.SetMaxWidth(max)
+	}
+}
+
+func WithOverflowStyle(style OverflowStyle) FlexboxItemOpt {
+	return func(item FlexboxItem) {
+		item.SetOverflowStyle(style)
+	}
+}
+
 type FlexboxItem interface {
 	GetComponent() components.Component
 
