@@ -1,7 +1,17 @@
-package flexbox
+package flexbox_item
 
 import (
+	"fmt"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/mieubrisse/box-layout-test/components"
+	"strings"
+)
+
+type OverflowStyle int
+
+const (
+	Wrap OverflowStyle = iota
+	Truncate
 )
 
 // These are simply conveniences for the flexbox.NewWithContent , so that it's super easy to declare a single-item box
@@ -26,6 +36,8 @@ func WithOverflowStyle(style OverflowStyle) FlexboxItemOpt {
 }
 
 type FlexboxItem interface {
+	components.Component
+
 	GetComponent() components.Component
 
 	GetMinWidth() FlexboxItemDimensionValue
@@ -56,6 +68,9 @@ type flexboxItemImpl struct {
 
 	overflowStyle OverflowStyle
 
+	// Min/maxes of the inner component
+	innerDimensionCache components.DimensionsCache
+
 	// TODO weight (analogous to flex-grow)
 	// When the child size constraint is set to MaxAvailableWidth, then this will be used
 }
@@ -69,6 +84,62 @@ func NewItem(component components.Component) FlexboxItem {
 		maxHeight:     MaxContentWidth,
 		overflowStyle: Wrap,
 	}
+}
+
+func (item *flexboxItemImpl) GetContentMinMax() (minWidth, maxWidth, minHeight, maxHeight uint) {
+	innerMinWidth, innerMaxWidth, innerMinHeight, innerMaxHeight := item.GetComponent().GetContentMinMax()
+	itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight := calculateFlexboxItemContentSizesFromInnerContentSizes(
+		innerMinWidth,
+		innerMaxWidth,
+		innerMinHeight,
+		innerMaxHeight,
+		item,
+	)
+
+	item.innerDimensionCache = components.DimensionsCache{
+		MinWidth:  innerMinWidth,
+		MaxWidth:  innerMaxWidth,
+		MinHeight: innerMinHeight,
+		MaxHeight: innerMaxHeight,
+	}
+
+	return itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight
+}
+
+func (item *flexboxItemImpl) GetContentHeightGivenWidth(width uint) uint {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (item *flexboxItemImpl) View(width uint, height uint) string {
+	component := item.GetComponent()
+
+	var widthWhenRendering uint
+	switch item.GetOverflowStyle() {
+	case Wrap:
+		widthWhenRendering = width
+	case Truncate:
+		// If truncating, the child will _think_ they have infinite space available
+		// and then we'll truncate them later
+		widthWhenRendering = item.innerDimensionCache.MaxWidth
+	default:
+		panic(fmt.Sprintf("Unknown item overflow style: %v", item.GetOverflowStyle()))
+	}
+
+	// TODO allow column format
+	result := component.View(widthWhenRendering, height)
+
+	// Truncate, in case any children are over
+	result = lipgloss.NewStyle().
+		MaxWidth(int(width)).
+		MaxHeight(1).
+		Render(result)
+
+	// Now expand, to ensure that children with MaxAvailableWidth get expanded
+	padNeeded := int(width) - lipgloss.Width(result)
+	result += strings.Repeat(" ", padNeeded)
+
+	return result
 }
 
 func (item *flexboxItemImpl) GetComponent() components.Component {
@@ -118,4 +189,34 @@ func (item *flexboxItemImpl) GetOverflowStyle() OverflowStyle {
 func (item *flexboxItemImpl) SetOverflowStyle(style OverflowStyle) FlexboxItem {
 	item.overflowStyle = style
 	return item
+}
+
+// ====================================================================================================
+//                                   Private Helper Functions
+// ====================================================================================================
+
+// Rescales an item's content size based on the per-item configuration the user has set
+// Max is guaranteed to be >= min
+func calculateFlexboxItemContentSizesFromInnerContentSizes(
+	innerMinWidth,
+	innertMaxWidth,
+	innerMinHeight,
+	innerMaxHeight uint,
+	item FlexboxItem,
+) (itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight uint) {
+	itemMinWidth = item.GetMinWidth().sizeRetriever(innerMinWidth, innertMaxWidth)
+	itemMaxWidth = item.GetMaxWidth().sizeRetriever(innerMinWidth, innertMaxWidth)
+
+	if itemMaxWidth < itemMinWidth {
+		itemMaxWidth = itemMinWidth
+	}
+
+	itemMinHeight = item.GetMinHeight().sizeRetriever(innerMinHeight, innerMaxHeight)
+	itemMaxHeight = item.GetMaxHeight().sizeRetriever(innerMinHeight, innerMaxHeight)
+
+	if itemMaxHeight < itemMinHeight {
+		itemMaxHeight = itemMinHeight
+	}
+
+	return
 }

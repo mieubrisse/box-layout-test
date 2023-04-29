@@ -4,6 +4,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mieubrisse/box-layout-test/components"
 	"github.com/mieubrisse/box-layout-test/components/flexbox"
+	"github.com/mieubrisse/box-layout-test/components/flexbox_item"
 )
 
 type BubbleBathOption func(*bubbleBathModel)
@@ -43,11 +44,11 @@ type bubbleBathModel struct {
 // NewBubbleBathModel creates a new tea.Model for tea.NewProgram based off the given InteractiveComponent
 func NewBubbleBathModel(app components.Component, options ...BubbleBathOption) tea.Model {
 	// We put the user's app in a box here so that we can get their app auto-resizing with the terminal
-	appBox := flexbox.New().SetChildren([]flexbox.FlexboxItem{
-		flexbox.NewItem(app).
+	appBox := flexbox.New().SetChildren([]flexbox_item.FlexboxItem{
+		flexbox_item.NewItem(app).
 			// TODO allow these to be configured?
-			SetMinWidth(flexbox.MinContentWidth).
-			SetMaxWidth(flexbox.MaxAvailableWidth),
+			SetMinWidth(flexbox_item.MinContentWidth).
+			SetMaxWidth(flexbox_item.MaxAvailableWidth),
 	})
 	result := &bubbleBathModel{
 		initCmd:         nil,

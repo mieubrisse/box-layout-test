@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mieubrisse/box-layout-test/bubblebath"
 	"github.com/mieubrisse/box-layout-test/components/flexbox"
+	"github.com/mieubrisse/box-layout-test/components/flexbox_item"
 	"github.com/mieubrisse/box-layout-test/components/text"
 	"os"
 )
@@ -20,16 +21,16 @@ func main() {
 	text3 := text.New("This is text 3")
 
 	yourBox := flexbox.NewWithContents(
-		flexbox.NewItem(text1).
-			SetMinWidth(flexbox.MaxContentWidth).
-			SetMaxWidth(flexbox.MaxAvailableWidth),
-		flexbox.NewItem(text2).
-			SetMinWidth(flexbox.MinContentWidth).
-			SetMinWidth(flexbox.MaxAvailableWidth).
-			SetOverflowStyle(flexbox.Truncate),
-		flexbox.NewItem(text3).
-			SetMinWidth(flexbox.MaxContentWidth).
-			SetMaxWidth(flexbox.MaxAvailableWidth),
+		flexbox_item.NewItem(text1).
+			SetMinWidth(flexbox_item.MaxContentWidth).
+			SetMaxWidth(flexbox_item.MaxAvailableWidth),
+		flexbox_item.NewItem(text2).
+			SetMinWidth(flexbox_item.MinContentWidth).
+			SetMinWidth(flexbox_item.MaxAvailableWidth).
+			SetOverflowStyle(flexbox_item.Truncate),
+		flexbox_item.NewItem(text3).
+			SetMinWidth(flexbox_item.MaxContentWidth).
+			SetMaxWidth(flexbox_item.MaxAvailableWidth),
 	)
 
 	if _, err := bubblebath.RunBubbleBathProgram(

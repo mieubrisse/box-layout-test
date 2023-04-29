@@ -1,4 +1,4 @@
-package flexbox
+package flexbox_item
 
 // This type represents values for a flexbox item dimension (height or width)
 type FlexboxItemDimensionValue struct {

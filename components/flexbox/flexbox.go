@@ -4,15 +4,9 @@ import (
 	"fmt"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mieubrisse/box-layout-test/components"
+	"github.com/mieubrisse/box-layout-test/components/flexbox_item"
 	"github.com/mieubrisse/box-layout-test/utilities"
 	"strings"
-)
-
-type OverflowStyle int
-
-const (
-	Wrap OverflowStyle = iota
-	Truncate
 )
 
 // When the child doesn't completely fill the box, where to put the child
@@ -24,16 +18,9 @@ const (
 	Right
 )
 
-type itemMinMaxDimensionsCache struct {
-	minWidth  uint
-	maxWidth  uint
-	minHeight uint
-	maxHeight uint
-}
-
 // TODO make an interface
 type Flexbox struct {
-	children []FlexboxItem
+	children []flexbox_item.FlexboxItem
 
 	// Cache containing the results of calculating min/max width/height for each child via GetContentMinMax
 	childrenMinMaxDimensionsCache []itemMinMaxDimensionsCache
@@ -49,8 +36,8 @@ type Flexbox struct {
 }
 
 // Convenience constructor for a box with a single element
-func NewWithContent(component components.Component, opts ...FlexboxItemOpt) *Flexbox {
-	item := NewItem(component)
+func NewWithContent(component components.Component, opts ...flexbox_item.FlexboxItemOpt) *Flexbox {
+	item := flexbox_item.NewItem(component)
 	for _, opt := range opts {
 		opt(item)
 	}
@@ -58,14 +45,14 @@ func NewWithContent(component components.Component, opts ...FlexboxItemOpt) *Fle
 }
 
 // Convenience constructor for a box with multiple elements
-func NewWithContents(items ...FlexboxItem) *Flexbox {
+func NewWithContents(items ...flexbox_item.FlexboxItem) *Flexbox {
 	return New().SetChildren(items)
 }
 
 func New() *Flexbox {
 	return &Flexbox{
 		padding:           0,
-		children:          make([]FlexboxItem, 0),
+		children:          make([]flexbox_item.FlexboxItem, 0),
 		border:            lipgloss.Border{},
 		horizontalJustify: Left,
 	}
@@ -82,7 +69,7 @@ func (b *Flexbox) SetBorder(border lipgloss.Border) *Flexbox {
 	return b
 }
 
-func (b *Flexbox) SetChildren(children []FlexboxItem) *Flexbox {
+func (b *Flexbox) SetChildren(children []flexbox_item.FlexboxItem) *Flexbox {
 	b.children = children
 	return b
 }
@@ -152,9 +139,9 @@ func (b Flexbox) View(width uint, height int) string {
 
 		var widthWhenRendering uint
 		switch item.GetOverflowStyle() {
-		case Wrap:
+		case flexbox_item.Wrap:
 			widthWhenRendering = childWidth
-		case Truncate:
+		case flexbox_item.Truncate:
 			// If truncating, the child will _think_ they have infinite space available
 			// and then we'll truncate them later
 			widthWhenRendering = contentWidthMaxes[idx]
@@ -233,7 +220,7 @@ func calculateFlexboxItemContentSizesFromInnerContentSizes(
 	innertMaxWidth,
 	innerMinHeight,
 	innerMaxHeight uint,
-	item FlexboxItem,
+	item flexbox_item.FlexboxItem,
 ) (itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight uint) {
 	itemMinWidth = item.GetMinWidth().sizeRetriever(innerMinWidth, innertMaxWidth)
 	itemMaxWidth = item.GetMaxWidth().sizeRetriever(innerMinWidth, innertMaxWidth)
