@@ -24,9 +24,19 @@ const (
 	Right
 )
 
+type itemMinMaxDimensionsCache struct {
+	minWidth  uint
+	maxWidth  uint
+	minHeight uint
+	maxHeight uint
+}
+
 // TODO make an interface
 type Flexbox struct {
 	children []FlexboxItem
+
+	// Cache containing the results of calculating min/max width/height for each child via GetContentMinMax
+	childrenMinMaxDimensionsCache []itemMinMaxDimensionsCache
 
 	// TODO cache content widths so we don't have to burn a bunch of energy recalculating them!
 
@@ -82,21 +92,45 @@ func (b *Flexbox) SetHorizontalJustify(justify HorizontalJustify) *Flexbox {
 	return b
 }
 
-func (b Flexbox) GetContentWidths() (min, max uint) {
-	additionalNonContentWidth := b.calculateAdditionalNonContentWidth()
+func (b Flexbox) GetContentMinMax() (minWidth, maxWidth, minHeight, maxHeight uint) {
 
-	var allChildrenMin, allChildrenMax uint
-	for _, item := range b.children {
-		contentMin, contentMax := item.GetComponent().GetContentWidths()
-		childMin, childMax := constrainItemContentSizes(contentMin, contentMax, item)
-		allChildrenMin = utilities.GetMaxUint(allChildrenMin, childMin)
-		allChildrenMax = utilities.GetMaxUint(allChildrenMax, childMax)
+	// TODO allow column layout
+
+	var childrenMinWidth, childrenMaxWidth, childrenMinHeight, childrenMaxHeight uint
+	newCache := make([]itemMinMaxDimensionsCache, len(b.children))
+	for idx, item := range b.children {
+		innerMinWidth, innerMaxWidth, innerMinHeight, innerMaxHeight := item.GetComponent().GetContentMinMax()
+		itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight := calculateFlexboxItemContentSizesFromInnerContentSizes(
+			innerMinWidth,
+			innerMaxWidth,
+			innerMinHeight,
+			innerMaxHeight,
+			item,
+		)
+
+		// Calculate the maxes
+		childrenMinWidth = utilities.GetMaxUint(childrenMinWidth, itemMinWidth)
+		childrenMaxWidth = utilities.GetMaxUint(childrenMaxWidth, itemMaxWidth)
+		childrenMinHeight = utilities.GetMaxUint(childrenMinHeight, itemMinHeight)
+		childrenMaxHeight = utilities.GetMaxUint(childrenMaxHeight, itemMaxHeight)
+
+		newCache[idx] = itemMinMaxDimensionsCache{
+			minWidth:  itemMinWidth,
+			maxWidth:  itemMaxWidth,
+			minHeight: itemMinHeight,
+			maxHeight: itemMaxHeight,
+		}
 	}
 
-	min = allChildrenMin + additionalNonContentWidth
-	max = allChildrenMax + additionalNonContentWidth
+	additionalNonContentWidth := b.calculateAdditionalNonContentWidth()
+	minWidth = childrenMinWidth + additionalNonContentWidth
+	maxWidth = childrenMaxWidth + additionalNonContentWidth
 
-	return min, max
+	additionalNonContentHeight := b.calculateAdditionalNonContentHeight()
+	minHeight = childrenMinHeight + additionalNonContentHeight
+	maxHeight = childrenMaxHeight + additionalNonContentHeight
+
+	return
 }
 
 func (b *Flexbox) GetContentHeightGivenWidth(width uint) uint {
@@ -107,73 +141,14 @@ func (b *Flexbox) GetContentHeightGivenWidth(width uint) uint {
 func (b Flexbox) View(width uint, height int) string {
 	// TODO caching of views????
 
-	// If wrap, we'll tell the child about what their real size will be
-	// to give them a chance to wrap
-	nonContentWidthNeeded := b.calculateAdditionalNonContentWidth()
-	// TODO margin
-	spaceAvailableForChildren := utilities.GetMaxUint(0, width-nonContentWidthNeeded)
-
-	numChildren := len(b.children)
-
-	// First, add up the total size the items would like
-	totalMinSizeDesired := uint(0) // Under this value, the flexbox will simply truncate
-	totalMaxSizeDesired := uint(0) // Above this value, only the MaxAvailableWidth items will expand
-	childSizes := make([]uint, numChildren)
-	maxConstrainedChildSizes := make([]uint, numChildren)
-	contentMaxes := make([]uint, numChildren)
-	for idx, item := range b.children {
-		contentMin, contentMax := item.GetComponent().GetContentWidths()
-		contrainedMin, contrainedMax := constrainItemContentSizes(contentMin, contentMax, item)
-		totalMinSizeDesired += contrainedMin
-		totalMaxSizeDesired += contrainedMax
-
-		contentMaxes[idx] = contentMax
-		childSizes[idx] = contrainedMin
-		maxConstrainedChildSizes[idx] = contrainedMax
-	}
-
-	// When min_desired_size < space_available < max_desired_size, scale everyone up equally between their
-	// min and max sizes
-	if spaceAvailableForChildren > totalMinSizeDesired {
-		weights := make([]uint, numChildren)
-		for idx, minChildSize := range childSizes {
-			maxChildSize := maxConstrainedChildSizes[idx]
-			childExpansionRange := maxChildSize - minChildSize
-			weights[idx] = childExpansionRange
-		}
-
-		spaceToDistributeEvenly := utilities.GetMinUint(
-			spaceAvailableForChildren-totalMinSizeDesired,
-			totalMaxSizeDesired-totalMinSizeDesired,
-		)
-
-		childSizes = addSpaceByWeight(spaceToDistributeEvenly, childSizes, weights)
-	}
-
-	// When width > max_desired_size, continue to scale only the elements whose max size is MaxAvailableWidth
-	if spaceAvailableForChildren > totalMaxSizeDesired {
-		weights := make([]uint, numChildren)
-		for idx, item := range b.children {
-			if item.GetMaxWidth().shouldGrow {
-				// TODO use actual weights
-				weights[idx] = 1
-				continue
-			}
-
-			weights[idx] = 0
-		}
-
-		spaceToDistributeToExpanders := spaceAvailableForChildren - totalMaxSizeDesired
-
-		childSizes = addSpaceByWeight(spaceToDistributeToExpanders, childSizes, weights)
-	}
+	childWidths := b.calculateChildWidths(width)
 
 	// Now render each child, ensuring we expand the child's string if the resulting string is less
 	allChildStrs := make([]string, numChildren)
 	for idx, item := range b.children {
 		component := item.GetComponent()
 
-		childWidth := childSizes[idx]
+		childWidth := childWidths[idx]
 
 		var widthWhenRendering uint
 		switch item.GetOverflowStyle() {
@@ -182,7 +157,7 @@ func (b Flexbox) View(width uint, height int) string {
 		case Truncate:
 			// If truncating, the child will _think_ they have infinite space available
 			// and then we'll truncate them later
-			widthWhenRendering = contentMaxes[idx]
+			widthWhenRendering = contentWidthMaxes[idx]
 		default:
 			panic(fmt.Sprintf("Unknown item overflow style: %v", item.GetOverflowStyle()))
 		}
@@ -202,13 +177,15 @@ func (b Flexbox) View(width uint, height int) string {
 		allChildStrs[idx] = childStr
 	}
 
-	// TODO margin
-	content := strings.Join(allChildStrs, "")
+	content := lipgloss.JoinHorizontal(lipgloss.Top, allChildStrs...)
 
-	// TODO split into left and right pad
+	result := lipgloss.NewStyle().
+		Padding(int(b.padding)).
+		Border(b.border).
+		Render(content)
+
 	pad := strings.Repeat(" ", int(b.padding))
 
-	result := b.border.Left + pad + content + pad + b.border.Right
 	return result
 }
 
@@ -233,16 +210,46 @@ func (b Flexbox) calculateAdditionalNonContentWidth() uint {
 	return totalNonContentWidthAdded
 }
 
-// Max is guaranteed to be >= min
-func constrainItemContentSizes(contentMin, contentMax uint, item FlexboxItem) (constrainedMin, constrainedMax uint) {
-	constrainedMin = item.GetMinWidth().sizeRetriever(contentMin, contentMax)
-	constrainedMax = item.GetMaxWidth().sizeRetriever(contentMin, contentMax)
+func (b Flexbox) calculateAdditionalNonContentHeight() uint {
+	nonContentHeightAdditions := []uint{
+		// Padding
+		2 * b.padding,
 
-	if constrainedMax < constrainedMin {
-		constrainedMax = constrainedMin
+		// Border
+		uint(b.border.GetTopSize() + b.border.GetBottomSize()),
 	}
 
-	return constrainedMin, constrainedMax
+	totalNonContentHeightAdded := uint(0)
+	for _, addition := range nonContentHeightAdditions {
+		totalNonContentHeightAdded += addition
+	}
+	return totalNonContentHeightAdded
+}
+
+// Rescales an item's content size based on the per-item configuration the user has set
+// Max is guaranteed to be >= min
+func calculateFlexboxItemContentSizesFromInnerContentSizes(
+	innerMinWidth,
+	innertMaxWidth,
+	innerMinHeight,
+	innerMaxHeight uint,
+	item FlexboxItem,
+) (itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight uint) {
+	itemMinWidth = item.GetMinWidth().sizeRetriever(innerMinWidth, innertMaxWidth)
+	itemMaxWidth = item.GetMaxWidth().sizeRetriever(innerMinWidth, innertMaxWidth)
+
+	if itemMaxWidth < itemMinWidth {
+		itemMaxWidth = itemMinWidth
+	}
+
+	itemMinHeight = item.GetMinHeight().sizeRetriever(innerMinHeight, innerMaxHeight)
+	itemMaxHeight = item.GetMaxHeight().sizeRetriever(innerMinHeight, innerMaxHeight)
+
+	if itemMaxHeight < itemMinHeight {
+		itemMaxHeight = itemMinHeight
+	}
+
+	return
 }
 
 // Distributes the space
@@ -291,4 +298,69 @@ func addSpaceByWeight(spaceToAllocate uint, inputSizes []uint, weights []uint) [
 	}
 
 	return result
+}
+
+func (b Flexbox) calculateChildWidths(flexboxWidth uint) []uint {
+	// If wrap, we'll tell the child about what their real size will be
+	// to give them a chance to wrap
+	nonContentWidthNeeded := b.calculateAdditionalNonContentWidth()
+	// TODO margin
+	widthAvailableForChildren := utilities.GetMaxUint(0, flexboxWidth-nonContentWidthNeeded)
+
+	numChildren := len(b.children)
+
+	// First, add up the total size the items would like
+	totalMinWidthDesired := uint(0) // Under this value, the flexbox will simply truncate
+	totalMaxWidthDesired := uint(0) // Above this value, only the MaxAvailableWidth items will expand
+	childWidths := make([]uint, numChildren)
+	maxConstrainedChildWidths := make([]uint, numChildren)
+	contentWidthMaxes := make([]uint, numChildren)
+	for idx, item := range b.children {
+		contentMin, contentMax := item.GetComponent().GetContentMinMax()
+		contrainedMin, contrainedMax := calculateFlexboxItemContentSizesFromInnerContentSizes(contentMin, contentMax, item)
+		totalMinWidthDesired += contrainedMin
+		totalMaxWidthDesired += contrainedMax
+
+		contentWidthMaxes[idx] = contentMax
+		childWidths[idx] = contrainedMin
+		maxConstrainedChildWidths[idx] = contrainedMax
+	}
+
+	// When min_desired_size < space_available < max_desired_size, scale everyone up equally between their
+	// min and max sizes
+	if widthAvailableForChildren > totalMinWidthDesired {
+		weights := make([]uint, numChildren)
+		for idx, minChildSize := range childWidths {
+			maxChildSize := maxConstrainedChildWidths[idx]
+			childExpansionRange := maxChildSize - minChildSize
+			weights[idx] = childExpansionRange
+		}
+
+		spaceToDistributeEvenly := utilities.GetMinUint(
+			widthAvailableForChildren-totalMinWidthDesired,
+			totalMaxWidthDesired-totalMinWidthDesired,
+		)
+
+		childWidths = addSpaceByWeight(spaceToDistributeEvenly, childWidths, weights)
+	}
+
+	// When width > max_desired_size, continue to scale only the elements whose max size is MaxAvailableWidth
+	if widthAvailableForChildren > totalMaxWidthDesired {
+		weights := make([]uint, numChildren)
+		for idx, item := range b.children {
+			if item.GetMaxWidth().shouldGrow {
+				// TODO use actual weights
+				weights[idx] = 1
+				continue
+			}
+
+			weights[idx] = 0
+		}
+
+		spaceToDistributeToExpanders := widthAvailableForChildren - totalMaxWidthDesired
+
+		childWidths = addSpaceByWeight(spaceToDistributeToExpanders, childWidths, weights)
+	}
+
+	return childWidths
 }

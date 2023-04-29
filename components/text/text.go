@@ -35,7 +35,7 @@ func (t *textImpl) SetContents(str string) Text {
 	return t
 }
 
-func (t textImpl) GetContentWidths() (min, max uint) {
+func (t textImpl) GetContentMinMax() (min, max uint) {
 	min = 0
 	for _, field := range strings.Fields(t.text) {
 		printableWidth := uint(ansi.PrintableRuneWidth(field))
