@@ -178,14 +178,23 @@ func (b Flexbox) calculateAdditionalNonContentHeight() uint {
 }
 
 // Distributes the space
-// The given space is guaranteed to be exactly distributed (no more or less will remain)
+// The only scenario where no space will be distributed is if there is no total weight
+// If the space does get distributed, it's guaranteed to be done exactly (no more or less will remain)
 func addSpaceByWeight(spaceToAllocate uint, inputSizes []uint, weights []uint) []uint {
+	result := make([]uint, len(inputSizes))
+	for idx, inputSize := range inputSizes {
+		result[idx] = inputSize
+	}
+
 	totalWeight := uint(0)
 	for _, weight := range weights {
 		totalWeight += weight
 	}
 
-	result := make([]uint, len(inputSizes))
+	// watch out for divide-by-zero
+	if totalWeight == 0 {
+		return result
+	}
 
 	desiredSpaceAllocated := float64(0)
 	actualSpaceAllocated := uint(0)

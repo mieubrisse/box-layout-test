@@ -105,11 +105,6 @@ func (item *flexboxItemImpl) GetContentMinMax() (minWidth, maxWidth, minHeight, 
 	return itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight
 }
 
-func (item *flexboxItemImpl) GetContentHeightGivenWidth(width uint) uint {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (item *flexboxItemImpl) View(width uint, height uint) string {
 	component := item.GetComponent()
 
@@ -130,15 +125,18 @@ func (item *flexboxItemImpl) View(width uint, height uint) string {
 
 	// Truncate, in case the inner item rusn over (which will almost definitely be the case when overflowStyle = Truncate)
 	result = lipgloss.NewStyle().
+		Width(int(width)).
+		Height(int(height)).
 		MaxWidth(int(width)).
 		MaxHeight(int(height)).
 		Render(result)
 
-	// Now expand, to ensure that the item takes up exactly the space we requested
-	result = lipgloss.NewStyle().
-		Width(int(width)).
-		Height(int(height)).
-		Render(result)
+	/*
+		// Now expand, to ensure that the item takes up exactly the space we requested
+		result = lipgloss.NewStyle().
+			Render(result)
+
+	*/
 
 	return result
 }
