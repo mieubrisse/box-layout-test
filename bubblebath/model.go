@@ -87,7 +87,7 @@ func (b bubbleBathModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (b bubbleBathModel) View() string {
-	return b.appBox.View(b.width)
+	return b.appBox.View(b.width, b.height)
 }
 
 /*

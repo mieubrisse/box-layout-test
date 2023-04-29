@@ -35,24 +35,32 @@ func (t *textImpl) SetContents(str string) Text {
 	return t
 }
 
-func (t textImpl) GetContentMinMax() (min, max uint) {
-	min = 0
+func (t *textImpl) GetContentMinMax() (minWidth, maxWidth, minHeight, maxHeight uint) {
+	minWidth = 0
 	for _, field := range strings.Fields(t.text) {
 		printableWidth := uint(ansi.PrintableRuneWidth(field))
-		if printableWidth > min {
-			min = printableWidth
+		if printableWidth > minWidth {
+			minWidth = printableWidth
 		}
 	}
 
-	max = uint(lipgloss.Width(t.text))
+	maxWidth = uint(lipgloss.Width(t.text))
+
+	minHeight = uint(lipgloss.Height(t.text))
+
+	minWidthWrapped := wordwrap.String(t.text, int(maxWidth))
+	maxHeight = uint(lipgloss.Height(minWidthWrapped))
 
 	return
 }
 
+/*
 func (t textImpl) GetContentHeightGivenWidth(width uint) uint {
 	wrappedText := wordwrap.String(t.text, int(width))
 	return uint(lipgloss.Height(wrappedText))
 }
+
+*/
 
 func (t textImpl) View(width uint, height uint) string {
 	return lipgloss.NewStyle().

@@ -13,23 +13,19 @@ import (
 
 func main() {
 	text1 := flexbox.NewWithContent(text.New("This is text 1")).
-		SetPadding(2).
 		SetBorder(lipgloss.NormalBorder())
-	text2 := flexbox.NewWithContent(text.New("This is text 2")).
-		SetPadding(2).
+	text2 := flexbox.NewWithContent(text.New("This is text 2"), flexbox_item.WithOverflowStyle(flexbox_item.Truncate)).
 		SetBorder(lipgloss.DoubleBorder())
 	text3 := text.New("This is text 3")
 
 	yourBox := flexbox.NewWithContents(
 		flexbox_item.NewItem(text1).
-			SetMinWidth(flexbox_item.MaxContentWidth).
 			SetMaxWidth(flexbox_item.MaxAvailableWidth),
 		flexbox_item.NewItem(text2).
 			SetMinWidth(flexbox_item.MinContentWidth).
-			SetMinWidth(flexbox_item.MaxAvailableWidth).
-			SetOverflowStyle(flexbox_item.Truncate),
+			SetMaxWidth(flexbox_item.MaxAvailableWidth),
 		flexbox_item.NewItem(text3).
-			SetMinWidth(flexbox_item.MaxContentWidth).
+			SetMinWidth(flexbox_item.MinContentWidth).
 			SetMaxWidth(flexbox_item.MaxAvailableWidth),
 	)
 

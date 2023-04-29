@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mieubrisse/box-layout-test/components"
-	"strings"
 )
 
 type OverflowStyle int
@@ -129,15 +128,17 @@ func (item *flexboxItemImpl) View(width uint, height uint) string {
 	// TODO allow column format
 	result := component.View(widthWhenRendering, height)
 
-	// Truncate, in case any children are over
+	// Truncate, in case the inner item rusn over (which will almost definitely be the case when overflowStyle = Truncate)
 	result = lipgloss.NewStyle().
 		MaxWidth(int(width)).
-		MaxHeight(1).
+		MaxHeight(int(height)).
 		Render(result)
 
-	// Now expand, to ensure that children with MaxAvailableWidth get expanded
-	padNeeded := int(width) - lipgloss.Width(result)
-	result += strings.Repeat(" ", padNeeded)
+	// Now expand, to ensure that the item takes up exactly the space we requested
+	result = lipgloss.NewStyle().
+		Width(int(width)).
+		Height(int(height)).
+		Render(result)
 
 	return result
 }

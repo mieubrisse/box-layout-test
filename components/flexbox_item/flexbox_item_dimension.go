@@ -9,6 +9,11 @@ type FlexboxItemDimensionValue struct {
 	shouldGrow bool
 }
 
+// Returns true if the flexbox item should grow in this dimension if there's space
+func (dimensionValue FlexboxItemDimensionValue) ShouldGrow() bool {
+	return dimensionValue.shouldGrow
+}
+
 // Indicates a size == the minimum content size of the item, which:
 // - For width is the size of the item if all wrapping opportunities are taken (basically, the length of the longest word)
 // - For height is the height of the item when no word-wrapping is done
