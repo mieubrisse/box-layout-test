@@ -99,7 +99,12 @@ func (b Flexbox) GetContentWidths() (min, max uint) {
 	return min, max
 }
 
-func (b Flexbox) View(width uint) string {
+func (b *Flexbox) GetContentHeightGivenWidth(width uint) uint {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (b Flexbox) View(width uint, height int) string {
 	// TODO caching of views????
 
 	// If wrap, we'll tell the child about what their real size will be

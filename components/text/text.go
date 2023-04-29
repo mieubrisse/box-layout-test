@@ -4,6 +4,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mieubrisse/box-layout-test/components"
 	"github.com/muesli/reflow/ansi"
+	"github.com/muesli/reflow/wordwrap"
 	"strings"
 )
 
@@ -35,8 +36,6 @@ func (t *textImpl) SetContents(str string) Text {
 }
 
 func (t textImpl) GetContentWidths() (min, max uint) {
-	max = uint(lipgloss.Width(t.text))
-
 	min = 0
 	for _, field := range strings.Fields(t.text) {
 		printableWidth := uint(ansi.PrintableRuneWidth(field))
@@ -45,9 +44,24 @@ func (t textImpl) GetContentWidths() (min, max uint) {
 		}
 	}
 
+	max = uint(lipgloss.Width(t.text))
+
 	return
 }
 
-func (t textImpl) View(width uint) string {
-	return lipgloss.NewStyle().Width(int(width)).Render(t.text)
+func (t textImpl) GetContentHeightGivenWidth(width uint) uint {
+	wrappedText := wordwrap.String(t.text, int(width))
+	return uint(lipgloss.Height(wrappedText))
 }
+
+func (t textImpl) View(width uint, height uint) string {
+	return lipgloss.NewStyle().
+		Width(int(width)).
+		// The only overflow behaviour we can support is truncate
+		MaxHeight(int(height)).
+		Render(t.text)
+}
+
+// ====================================================================================================
+//                                   Private Helper Functions
+// ====================================================================================================
