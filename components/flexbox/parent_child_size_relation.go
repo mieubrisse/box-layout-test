@@ -1,4 +1,4 @@
-package components
+package flexbox
 
 // Prebuilt constants for the child's size
 type ChildWidthControl int
@@ -23,8 +23,25 @@ const (
 // If min > max, then the max will be defined by the min
 type ChildSizeConstraint struct {
 	// The width under which a child won't be asked to reflow (it'll just be truncated)
-	Min ChildWidthControl
+	min ChildWidthControl
 
 	// The width over which a child cannot expand
-	Max ChildWidthControl
+	max ChildWidthControl
+}
+
+func NewConstraint() *ChildSizeConstraint {
+	return &ChildSizeConstraint{
+		min: MinContent,
+		max: MaxContent,
+	}
+}
+
+func (constraint *ChildSizeConstraint) SetMin(control ChildWidthControl) *ChildSizeConstraint {
+	constraint.min = control
+	return constraint
+}
+
+func (constraint *ChildSizeConstraint) SetMax(control ChildWidthControl) *ChildSizeConstraint {
+	constraint.max = control
+	return constraint
 }

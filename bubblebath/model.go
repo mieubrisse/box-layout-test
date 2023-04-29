@@ -3,7 +3,7 @@ package bubblebath
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mieubrisse/box-layout-test/components"
-	"github.com/mieubrisse/box-layout-test/components/box"
+	"github.com/mieubrisse/box-layout-test/components/flexbox"
 )
 
 type BubbleBathOption func(*bubbleBathModel)
@@ -44,10 +44,12 @@ type bubbleBathModel struct {
 
 // NewBubbleBathModel creates a new tea.Model for tea.NewProgram based off the given InteractiveComponent
 func NewBubbleBathModel(app components.Component, options ...BubbleBathOption) tea.Model {
-	appBox := box.New(app)
-	appBox.SetChildSizeContraint(components.ChildSizeConstraint{
-		Min: components.MinContent,
-		Max: components.MaxAvailable,
+	appBox := flexbox.New().SetChildren([]*flexbox.FlexboxItem{
+		flexbox.NewItem(app).SetConstraint(
+			flexbox.NewConstraint().
+				SetMin(flexbox.MinContent).
+				SetMax(flexbox.MaxAvailable),
+		),
 	})
 	result := &bubbleBathModel{
 		initCmd:         nil,

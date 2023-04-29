@@ -3,7 +3,6 @@ package flexbox
 import (
 	"fmt"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mieubrisse/box-layout-test/components"
 	"github.com/mieubrisse/box-layout-test/utilities"
 	"strings"
 )
@@ -24,25 +23,10 @@ const (
 	Right
 )
 
-type FlexboxItem struct {
-	Component components.Component
-
-	// The constraints determine how the item flexes
-	// This is analogous to both "flex-basis" and "flex-grow", where:
-	// - MaxAvailable indicates "flex-grow: >1" (see weight below)
-	// - Anything else indicates "flex-grow: 0", and sets the "flex-basis"
-	Constraint components.ChildSizeConstraint
-
-	OverflowStyle OverflowStyle
-
-	// TODO weight (analogous to flex-grow)
-	// When the child size constraint is set to MaxAvailable, then this will be used
-}
-
 // TODO constructor
 
 type Flexbox struct {
-	children []FlexboxItem
+	children []*FlexboxItem
 
 	// TODO make configurable on left and right
 	padding uint
@@ -55,30 +39,34 @@ type Flexbox struct {
 	// TODO put a cache that caches the ContentWidths in between the GetContentWidth and View step
 }
 
-func New() Flexbox {
-	return Flexbox{
+func New() *Flexbox {
+	return &Flexbox{
 		padding:           0,
-		children:          make([]FlexboxItem, 0),
+		children:          make([]*FlexboxItem, 0),
 		border:            lipgloss.Border{},
 		horizontalJustify: Left,
 	}
 }
 
 // TODO make this configurable per side
-func (b *Flexbox) SetPadding(padding uint) {
+func (b *Flexbox) SetPadding(padding uint) *Flexbox {
 	b.padding = padding
+	return b
 }
 
-func (b *Flexbox) SetBorder(border lipgloss.Border) {
+func (b *Flexbox) SetBorder(border lipgloss.Border) *Flexbox {
 	b.border = border
+	return b
 }
 
-func (b *Flexbox) SetChildren(children []FlexboxItem) {
+func (b *Flexbox) SetChildren(children []*FlexboxItem) *Flexbox {
 	b.children = children
+	return b
 }
 
-func (b *Flexbox) SetHorizontalJustify(justify HorizontalJustify) {
+func (b *Flexbox) SetHorizontalJustify(justify HorizontalJustify) *Flexbox {
 	b.horizontalJustify = justify
+	return b
 }
 
 func (b Flexbox) GetContentWidths() (min, max uint) {
@@ -146,7 +134,7 @@ func (b Flexbox) View(width uint) string {
 	if spaceAvailableForChildren > maxChildSizeDesired {
 		weights := make([]uint, numChildren)
 		for idx, item := range b.children {
-			if item.Constraint.Max == components.MaxAvailable {
+			if item.constraint.max == MaxAvailable {
 				// TODO use actual weights
 				weights[idx] = 1
 				continue
@@ -163,12 +151,12 @@ func (b Flexbox) View(width uint) string {
 	// Now render each child, ensuring we expand the child's string if the resulting string is less
 	allChildStrs := make([]string, numChildren)
 	for idx, item := range b.children {
-		component := item.Component
+		component := item.component
 
 		childWidth := childSizes[idx]
 
 		var widthWhenRendering uint
-		switch item.OverflowStyle {
+		switch item.overflowStyle {
 		case Wrap:
 			widthWhenRendering = childWidth
 		case Truncate:
@@ -176,7 +164,7 @@ func (b Flexbox) View(width uint) string {
 			// and then we'll truncate them later
 			widthWhenRendering = maxChildSizes[idx]
 		default:
-			panic(fmt.Sprintf("Unknown overflow style: %v", item.OverflowStyle))
+			panic(fmt.Sprintf("Unknown overflow style: %v", item.overflowStyle))
 		}
 
 		childStr := component.View(widthWhenRendering)
@@ -224,25 +212,25 @@ func (b Flexbox) calculateAdditionalNonContentWidth() uint {
 
 // Get the possible size ranges for the child, using the child size constraints
 // Max is guaranteed to be >= min
-func getChildSizeRangeUsingConstraints(item FlexboxItem) (min, max uint) {
-	innerMin, innerMax := item.Component.GetContentWidths()
+func getChildSizeRangeUsingConstraints(item *FlexboxItem) (min, max uint) {
+	innerMin, innerMax := item.component.GetContentWidths()
 
-	switch item.Constraint.Min {
-	case components.MinContent:
+	switch item.constraint.min {
+	case MinContent:
 		min = innerMin
-	case components.MaxContent, components.MaxAvailable:
+	case MaxContent, MaxAvailable:
 		min = innerMax
 	default:
-		panic(fmt.Sprintf("Unknown minimum component size constraint: %v", item.Constraint.Min))
+		panic(fmt.Sprintf("Unknown minimum component size constraint: %v", item.constraint.min))
 	}
 
-	switch item.Constraint.Max {
-	case components.MinContent:
+	switch item.constraint.max {
+	case MinContent:
 		max = innerMin
-	case components.MaxContent, components.MaxAvailable:
+	case MaxContent, MaxAvailable:
 		max = innerMax
 	default:
-		panic(fmt.Sprintf("Unknown maximum component size constraint: %v", item.Constraint.Max))
+		panic(fmt.Sprintf("Unknown maximum component size constraint: %v", item.constraint.max))
 	}
 
 	if max < min {
