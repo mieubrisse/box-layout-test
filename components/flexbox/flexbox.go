@@ -7,7 +7,6 @@ import (
 	"github.com/mieubrisse/box-layout-test/utilities"
 	"github.com/muesli/reflow/padding"
 	"github.com/muesli/reflow/truncate"
-	"math"
 	"strings"
 )
 
@@ -47,8 +46,6 @@ type FlexboxItem struct {
 type Flexbox struct {
 	children []FlexboxItem
 
-	overflowStyle OverflowStyle
-
 	// TODO make configurable on left and right
 	padding uint
 
@@ -64,7 +61,6 @@ func New(inner components.Component) Flexbox {
 	return Flexbox{
 		padding:           0,
 		children:          make([]FlexboxItem, 0),
-		overflowStyle:     Wrap,
 		border:            lipgloss.Border{},
 		horizontalJustify: Left,
 	}
@@ -111,91 +107,94 @@ func (b Flexbox) View(width uint) string {
 	// If wrap, we'll tell the child about what their real size will be
 	// to give them a chance to wrap
 	nonContentWidthNeeded := b.calculateAdditionalNonContentWidth()
+	// TODO margin
 	spaceAvailableForChildren := utilities.GetMaxUint(0, width-nonContentWidthNeeded)
 
 	numChildren := len(b.children)
-	childMins := make([]uint, numChildren)
-	childMaxes := make([]uint, numChildren)
-	itemWeights := make([]float64, numChildren)
-	childSizes := make([]uint, numChildren)
 
 	// First, add up the total size the items would like
 	minChildSizeDesired := uint(0) // Under this value, the flexbox will simply truncate
 	maxChildSizeDesired := uint(0) // Above this value, only the MaxAvailable items will expand
-	totalWeight := float64(0)
+	childSizes := make([]uint, numChildren)
+	maxChildSizes := make([]uint, numChildren)
 	for idx, item := range b.children {
-		// TODO use actual weights
-		totalWeight += 1.0
-
 		childMin, childMax := getChildSizeRangeUsingConstraints(item)
 		minChildSizeDesired += childMin
 		maxChildSizeDesired += childMax
 
 		childSizes[idx] = childMin
+		maxChildSizes[idx] = childMax
 	}
 
-	// When min_desired_size < width < max_desired_size, scale everyone up equally between their
+	// When min_desired_size < space_available < max_desired_size, scale everyone up equally between their
 	// min and max sizes
-	if width > minChildSizeDesired && width < maxChildSizeDesired {
-
-	}
-	evenScalePercentage := float64(width-minChildSizeDesired) / float64(maxChildSizeDesired-minChildSizeDesired)
-	evenScalePercentage := math.Max(0.0, math.Min(1.0, evenScalePercentage))
-
-	freeSpace := spaceAvailableForChildren - max
-
-	spaceForFlexingElements := bubble_bath.GetMaxInt(0, availableSpace-totalFixedSizeConsumed)
-	spacePerWeight := float64(spaceForFlexingElements) / totalWeight
-
-	// Now, allocate
-	results := make([]int, len(impl.items))
-	for idx, item := range impl.items {
-		var desiredItemSpace int
-		if item.FixedSize != 0 {
-			desiredItemSpace = item.FixedSize
-		} else {
-			desiredItemSpace = int(math.Round(item.FlexWeight * spacePerWeight))
-		}
-		actualItemSpace := bubble_bath.GetMinInt(availableSpace, desiredItemSpace)
-		results[idx] = actualItemSpace
-
-		availableSpace -= actualItemSpace
-	}
-
-	var widthToGiveChild uint
-	switch b.overflowStyle {
-	case Wrap:
-
-		childMin, childMax := b.getChildSizeRange()
-		if b.childSizeConstraint.Min == components.MaxAvailable {
-			childMin = utilities.GetMaxUint(childMin, spaceAvailableForChildren)
-		}
-		if b.childSizeConstraint.Max == components.MaxAvailable {
-			childMax = utilities.GetMaxUint(childMax, spaceAvailableForChildren)
+	if spaceAvailableForChildren > minChildSizeDesired && spaceAvailableForChildren < maxChildSizeDesired {
+		weights := make([]uint, numChildren)
+		for idx := range b.children {
+			// TODO use actual weights
+			weights[idx] = 1
 		}
 
-		widthToGiveChild = utilities.Clamp(width, childMin, childMax)
-	case Truncate:
-		// If truncating, the child will _think_ they have the full space available
-		// and then we'll truncate them later
-		// TODO cache this so we don't have to run down the tree again???
-		_, innerMax := b.child.GetContentWidths()
-		widthToGiveChild = innerMax
-	default:
-		panic(fmt.Sprintf("Unknown overflow style: %v", b.overflowStyle))
+		spaceToDistributeEvenly := maxChildSizeDesired - spaceAvailableForChildren
+
+		childSizes = addSpaceByWeight(spaceToDistributeEvenly, childSizes, weights)
 	}
 
-	// Truncate
-	truncatedChildStr := truncate.String(b.child.View(widthToGiveChild), spaceAvailableForChildren)
+	// When width > max_desired_size, continue to scale only the elements whose max size is MaxAvailable
+	if spaceAvailableForChildren > maxChildSizeDesired {
+		weights := make([]uint, numChildren)
+		for idx, item := range b.children {
+			if item.constraint.Max == components.MaxAvailable {
+				// TODO use actual weights
+				weights[idx] = 1
+				continue
+			}
 
-	// Now expand, to ensure our box still remains the right size in the case of
-	// small strings
-	expandedChildStr := padding.String(truncatedChildStr, spaceAvailableForChildren)
+			weights[idx] = 0
+		}
+
+		spaceToDistributeToExpanders := maxChildSizeDesired - spaceAvailableForChildren
+
+		childSizes = addSpaceByWeight(spaceToDistributeToExpanders, childSizes, weights)
+	}
+
+	// Now render each child, ensuring we expand the child's string if the resulting string is less
+	allChildStrs := make([]string, numChildren)
+	for idx, item := range b.children {
+		component := item.component
+
+		childWidth := childSizes[idx]
+
+		var widthWhenRendering uint
+		switch item.overflowStyle {
+		case Wrap:
+			widthWhenRendering = childWidth
+		case Truncate:
+			// If truncating, the child will _think_ they have the full space available
+			// and then we'll truncate them later
+			widthWhenRendering = maxChildSizes[idx]
+		default:
+			panic(fmt.Sprintf("Unknown overflow style: %v", item.overflowStyle))
+		}
+
+		childStr := component.View(widthWhenRendering)
+
+		// Truncate, in case any children are over
+		childStr = truncate.String(childStr, childWidth)
+
+		// Now expand, to ensure that children with MaxAvailable get expanded
+		childStr = padding.String(childStr, childWidth)
+
+		allChildStrs[idx] = childStr
+	}
+
+	// TODO margin
+	content := strings.Join(allChildStrs, "")
 
 	// TODO split into left and right pad
 	pad := strings.Repeat(" ", int(b.padding))
 
-	result := b.border.Left + pad + expandedChildStr + pad + b.border.Right
+	result := b.border.Left + pad + content + pad + b.border.Right
 	return result
 }
 
@@ -252,7 +251,7 @@ func getChildSizeRangeUsingConstraints(item FlexboxItem) (min, max uint) {
 
 // Distributes the space
 // The given space is guaranteed to be exactly distributed (no more or less will remain)
-func distributeSpaceByWeight(spaceToAllocate uint, inputSizes []uint, weights []uint) []uint {
+func addSpaceByWeight(spaceToAllocate uint, inputSizes []uint, weights []uint) []uint {
 	totalWeight := uint(0)
 	for _, weight := range weights {
 		totalWeight += weight
