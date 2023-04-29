@@ -5,8 +5,10 @@ import (
 	"github.com/mieubrisse/box-layout-test/components"
 	"github.com/mieubrisse/box-layout-test/components/flexbox_item"
 	"github.com/mieubrisse/box-layout-test/utilities"
+	"strings"
 )
 
+// TODO make this "main axis justify"
 // When the child doesn't completely fill the box, where to put the child
 type HorizontalJustify int
 
@@ -108,29 +110,51 @@ func (b *Flexbox) GetContentMinMax() (minWidth, maxWidth, minHeight, maxHeight u
 	return
 }
 
-func (b *Flexbox) GetContentHeightGivenWidth(width uint) uint {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (b Flexbox) View(width uint, height uint) string {
 	// TODO caching of views????
 
-	childWidths := b.calculateChildWidths(width)
+	nonContentWidthNeeded := b.calculateAdditionalNonContentWidth()
+	// TODO margin
+	widthAvailableForChildren := utilities.GetMaxUint(0, width-nonContentWidthNeeded)
+
+	childWidths, totalWidthUsedByChildren := b.calculateChildWidths(widthAvailableForChildren)
+	widthNotUsedByChildren := widthAvailableForChildren - totalWidthUsedByChildren
 
 	// TODO allow different types of expansion in cross axis
 	additionalNonContentHeight := b.calculateAdditionalNonContentHeight()
 	availableChildHeight := utilities.GetMaxUint(0, height-additionalNonContentHeight)
 
 	// Now render each child, ensuring we expand the child's string if the resulting string is less
-	allChildStrs := make([]string, len(b.children))
+	allContentFragments := make([]string, len(b.children))
 	for idx, item := range b.children {
 		childWidth := childWidths[idx]
 		childStr := item.View(childWidth, availableChildHeight)
-		allChildStrs[idx] = childStr
+		allContentFragments[idx] = childStr
 	}
 
-	content := lipgloss.JoinHorizontal(lipgloss.Top, allChildStrs...)
+	switch b.horizontalJustify {
+	case Left:
+		pad := strings.Repeat(" ", int(widthNotUsedByChildren))
+		allContentFragments = append(allContentFragments, pad)
+	case Right:
+		pad := strings.Repeat(" ", int(widthNotUsedByChildren))
+		allContentFragments = append([]string{pad}, allContentFragments...)
+	case Center:
+		leftPadSize := widthNotUsedByChildren / 2
+		rightPadSize := widthNotUsedByChildren - leftPadSize
+		leftPad := strings.Repeat(" ", int(leftPadSize))
+		rightPad := strings.Repeat(" ", int(rightPadSize))
+
+		newContentFragments := append([]string{leftPad}, allContentFragments...)
+		newContentFragments = append(newContentFragments, rightPad)
+		allContentFragments = newContentFragments
+	}
+
+	content := lipgloss.JoinHorizontal(lipgloss.Top, allContentFragments...)
+
+	switch b.horizontalJustify {
+
+	}
 
 	result := lipgloss.NewStyle().
 		Padding(int(b.padding)).
@@ -234,12 +258,7 @@ func addSpaceByWeight(spaceToAllocate uint, inputSizes []uint, weights []uint) [
 	return result
 }
 
-func (b Flexbox) calculateChildWidths(flexboxWidth uint) []uint {
-	// If wrap, we'll tell the child about what their real size will be
-	// to give them a chance to wrap
-	nonContentWidthNeeded := b.calculateAdditionalNonContentWidth()
-	// TODO margin
-	widthAvailableForChildren := utilities.GetMaxUint(0, flexboxWidth-nonContentWidthNeeded)
+func (b Flexbox) calculateChildWidths(widthAvailableForChildren uint) ([]uint, uint) {
 
 	numChildren := len(b.children)
 
@@ -294,5 +313,16 @@ func (b Flexbox) calculateChildWidths(flexboxWidth uint) []uint {
 		childWidths = addSpaceByWeight(spaceToDistributeToExpanders, childWidths, weights)
 	}
 
-	return childWidths
+	// Finally, ensure that the child widths don't exceed our available space
+	totalWidthUsed := uint(0)
+	widthAvailable := widthAvailableForChildren
+	for idx, childWidth := range childWidths {
+		actualWidth := utilities.GetMinUint(widthAvailable, childWidth)
+		childWidths[idx] = actualWidth
+
+		widthAvailable -= actualWidth
+		totalWidthUsed += actualWidth
+	}
+
+	return childWidths, totalWidthUsed
 }
