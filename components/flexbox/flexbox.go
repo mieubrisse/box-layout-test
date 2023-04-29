@@ -5,8 +5,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mieubrisse/box-layout-test/components"
 	"github.com/mieubrisse/box-layout-test/utilities"
-	"github.com/muesli/reflow/padding"
-	"github.com/muesli/reflow/truncate"
 	"strings"
 )
 
@@ -27,15 +25,15 @@ const (
 )
 
 type FlexboxItem struct {
-	component components.Component
+	Component components.Component
 
 	// The constraints determine how the item flexes
 	// This is analogous to both "flex-basis" and "flex-grow", where:
 	// - MaxAvailable indicates "flex-grow: >1" (see weight below)
 	// - Anything else indicates "flex-grow: 0", and sets the "flex-basis"
-	constraint components.ChildSizeConstraint
+	Constraint components.ChildSizeConstraint
 
-	overflowStyle OverflowStyle
+	OverflowStyle OverflowStyle
 
 	// TODO weight (analogous to flex-grow)
 	// When the child size constraint is set to MaxAvailable, then this will be used
@@ -57,7 +55,7 @@ type Flexbox struct {
 	// TODO put a cache that caches the ContentWidths in between the GetContentWidth and View step
 }
 
-func New(inner components.Component) Flexbox {
+func New() Flexbox {
 	return Flexbox{
 		padding:           0,
 		children:          make([]FlexboxItem, 0),
@@ -128,14 +126,18 @@ func (b Flexbox) View(width uint) string {
 
 	// When min_desired_size < space_available < max_desired_size, scale everyone up equally between their
 	// min and max sizes
-	if spaceAvailableForChildren > minChildSizeDesired && spaceAvailableForChildren < maxChildSizeDesired {
+	if spaceAvailableForChildren > minChildSizeDesired {
 		weights := make([]uint, numChildren)
-		for idx := range b.children {
-			// TODO use actual weights
-			weights[idx] = 1
+		for idx, minChildSize := range childSizes {
+			maxChildSize := maxChildSizes[idx]
+			childExpansionRange := maxChildSize - minChildSize
+			weights[idx] = childExpansionRange
 		}
 
-		spaceToDistributeEvenly := maxChildSizeDesired - spaceAvailableForChildren
+		spaceToDistributeEvenly := utilities.GetMinUint(
+			spaceAvailableForChildren-minChildSizeDesired,
+			maxChildSizeDesired-minChildSizeDesired,
+		)
 
 		childSizes = addSpaceByWeight(spaceToDistributeEvenly, childSizes, weights)
 	}
@@ -144,7 +146,7 @@ func (b Flexbox) View(width uint) string {
 	if spaceAvailableForChildren > maxChildSizeDesired {
 		weights := make([]uint, numChildren)
 		for idx, item := range b.children {
-			if item.constraint.Max == components.MaxAvailable {
+			if item.Constraint.Max == components.MaxAvailable {
 				// TODO use actual weights
 				weights[idx] = 1
 				continue
@@ -153,7 +155,7 @@ func (b Flexbox) View(width uint) string {
 			weights[idx] = 0
 		}
 
-		spaceToDistributeToExpanders := maxChildSizeDesired - spaceAvailableForChildren
+		spaceToDistributeToExpanders := spaceAvailableForChildren - maxChildSizeDesired
 
 		childSizes = addSpaceByWeight(spaceToDistributeToExpanders, childSizes, weights)
 	}
@@ -161,12 +163,12 @@ func (b Flexbox) View(width uint) string {
 	// Now render each child, ensuring we expand the child's string if the resulting string is less
 	allChildStrs := make([]string, numChildren)
 	for idx, item := range b.children {
-		component := item.component
+		component := item.Component
 
 		childWidth := childSizes[idx]
 
 		var widthWhenRendering uint
-		switch item.overflowStyle {
+		switch item.OverflowStyle {
 		case Wrap:
 			widthWhenRendering = childWidth
 		case Truncate:
@@ -174,16 +176,17 @@ func (b Flexbox) View(width uint) string {
 			// and then we'll truncate them later
 			widthWhenRendering = maxChildSizes[idx]
 		default:
-			panic(fmt.Sprintf("Unknown overflow style: %v", item.overflowStyle))
+			panic(fmt.Sprintf("Unknown overflow style: %v", item.OverflowStyle))
 		}
 
 		childStr := component.View(widthWhenRendering)
 
 		// Truncate, in case any children are over
-		childStr = truncate.String(childStr, childWidth)
+		childStr = lipgloss.NewStyle().MaxWidth(int(childWidth)).Render(childStr)
 
 		// Now expand, to ensure that children with MaxAvailable get expanded
-		childStr = padding.String(childStr, childWidth)
+		padNeeded := int(childWidth) - lipgloss.Width(childStr)
+		childStr += strings.Repeat(" ", padNeeded)
 
 		allChildStrs[idx] = childStr
 	}
@@ -222,24 +225,24 @@ func (b Flexbox) calculateAdditionalNonContentWidth() uint {
 // Get the possible size ranges for the child, using the child size constraints
 // Max is guaranteed to be >= min
 func getChildSizeRangeUsingConstraints(item FlexboxItem) (min, max uint) {
-	innerMin, innerMax := item.component.GetContentWidths()
+	innerMin, innerMax := item.Component.GetContentWidths()
 
-	switch item.constraint.Min {
+	switch item.Constraint.Min {
 	case components.MinContent:
 		min = innerMin
 	case components.MaxContent, components.MaxAvailable:
 		min = innerMax
 	default:
-		panic(fmt.Sprintf("Unknown minimum component size constraint: %v", item.constraint.Min))
+		panic(fmt.Sprintf("Unknown minimum component size constraint: %v", item.Constraint.Min))
 	}
 
-	switch item.constraint.Max {
+	switch item.Constraint.Max {
 	case components.MinContent:
 		max = innerMin
 	case components.MaxContent, components.MaxAvailable:
 		max = innerMax
 	default:
-		panic(fmt.Sprintf("Unknown maximum component size constraint: %v", item.constraint.Max))
+		panic(fmt.Sprintf("Unknown maximum component size constraint: %v", item.Constraint.Max))
 	}
 
 	if max < min {

@@ -3,25 +3,41 @@ package main
 import (
 	"fmt"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mieubrisse/box-layout-test/bubblebath"
 	"github.com/mieubrisse/box-layout-test/components"
-	"github.com/mieubrisse/box-layout-test/components/box"
+	"github.com/mieubrisse/box-layout-test/components/flexbox"
 	"github.com/mieubrisse/box-layout-test/components/text"
 	"os"
 )
 
 func main() {
-	myText := text.New("Hello, world!")
+	text1 := text.New("This is text 1")
+	text2 := text.New("This is text 2")
+	text3 := text.New("This is text 3")
 
-	myBox := box.New(myText)
-	myBox.SetBorder(lipgloss.NormalBorder())
-
-	yourBox := box.New(myBox)
-	yourBox.SetBorder(lipgloss.DoubleBorder())
-	yourBox.SetChildSizeContraint(components.ChildSizeConstraint{
-		Min: components.MinContent,
-		Max: components.MaxAvailable,
+	yourBox := flexbox.New()
+	yourBox.SetChildren([]flexbox.FlexboxItem{
+		{
+			Component: text1,
+			Constraint: components.ChildSizeConstraint{
+				Min: components.MaxContent,
+				Max: components.MaxAvailable,
+			},
+		},
+		{
+			Component: text2,
+			Constraint: components.ChildSizeConstraint{
+				Min: components.MinContent,
+				Max: components.MaxAvailable,
+			},
+		},
+		{
+			Component: text3,
+			Constraint: components.ChildSizeConstraint{
+				Min: components.MaxContent,
+				Max: components.MaxAvailable,
+			},
+		},
 	})
 
 	if _, err := bubblebath.RunBubbleBathProgram(
