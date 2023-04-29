@@ -37,8 +37,8 @@ type bubbleBathModel struct {
 
 	app components.Component
 
-	width  uint
-	height uint
+	width  int
+	height int
 }
 
 // NewBubbleBathModel creates a new tea.Model for tea.NewProgram based off the given InteractiveComponent
@@ -77,8 +77,8 @@ func (b bubbleBathModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.WindowSizeMsg:
 		// b.appComponent.Resize(msg.Width, msg.Height)
-		b.width = uint(msg.Width)
-		b.height = uint(msg.Height)
+		b.width = msg.Width
+		b.height = msg.Height
 		return b, nil
 	}
 

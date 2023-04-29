@@ -35,38 +35,30 @@ func (t *textImpl) SetContents(str string) Text {
 	return t
 }
 
-func (t *textImpl) GetContentMinMax() (minWidth, maxWidth, minHeight, maxHeight uint) {
+func (t *textImpl) GetContentMinMax() (minWidth int, maxWidth int, minHeight int, maxHeight int) {
 	minWidth = 0
 	for _, field := range strings.Fields(t.text) {
-		printableWidth := uint(ansi.PrintableRuneWidth(field))
+		printableWidth := ansi.PrintableRuneWidth(field)
 		if printableWidth > minWidth {
 			minWidth = printableWidth
 		}
 	}
 
-	maxWidth = uint(lipgloss.Width(t.text))
+	maxWidth = lipgloss.Width(t.text)
 
-	minHeight = uint(lipgloss.Height(t.text))
+	minHeight = lipgloss.Height(t.text)
 
-	minWidthWrapped := wordwrap.String(t.text, int(maxWidth))
-	maxHeight = uint(lipgloss.Height(minWidthWrapped))
+	minWidthWrapped := wordwrap.String(t.text, maxWidth)
+	maxHeight = lipgloss.Height(minWidthWrapped)
 
 	return
 }
 
-/*
-func (t textImpl) GetContentHeightGivenWidth(width uint) uint {
-	wrappedText := wordwrap.String(t.text, int(width))
-	return uint(lipgloss.Height(wrappedText))
-}
-
-*/
-
-func (t textImpl) View(width uint, height uint) string {
+func (t textImpl) View(width int, height int) string {
 	return lipgloss.NewStyle().
-		Width(int(width)).
+		Width(width).
 		// The only overflow behaviour we can support is truncate
-		MaxHeight(int(height)).
+		MaxHeight(height).
 		Render(t.text)
 }
 

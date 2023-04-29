@@ -85,7 +85,7 @@ func NewItem(component components.Component) FlexboxItem {
 	}
 }
 
-func (item *flexboxItemImpl) GetContentMinMax() (minWidth, maxWidth, minHeight, maxHeight uint) {
+func (item *flexboxItemImpl) GetContentMinMax() (minWidth int, maxWidth int, minHeight int, maxHeight int) {
 	innerMinWidth, innerMaxWidth, innerMinHeight, innerMaxHeight := item.GetComponent().GetContentMinMax()
 	itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight := calculateFlexboxItemContentSizesFromInnerContentSizes(
 		innerMinWidth,
@@ -105,10 +105,10 @@ func (item *flexboxItemImpl) GetContentMinMax() (minWidth, maxWidth, minHeight, 
 	return itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight
 }
 
-func (item *flexboxItemImpl) View(width uint, height uint) string {
+func (item *flexboxItemImpl) View(width int, height int) string {
 	component := item.GetComponent()
 
-	var widthWhenRendering uint
+	var widthWhenRendering int
 	switch item.GetOverflowStyle() {
 	case Wrap:
 		widthWhenRendering = width
@@ -200,9 +200,9 @@ func calculateFlexboxItemContentSizesFromInnerContentSizes(
 	innerMinWidth,
 	innertMaxWidth,
 	innerMinHeight,
-	innerMaxHeight uint,
+	innerMaxHeight int,
 	item FlexboxItem,
-) (itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight uint) {
+) (itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight int) {
 	itemMinWidth = item.GetMinWidth().sizeRetriever(innerMinWidth, innertMaxWidth)
 	itemMaxWidth = item.GetMaxWidth().sizeRetriever(innerMinWidth, innertMaxWidth)
 

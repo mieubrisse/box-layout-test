@@ -1,22 +1,22 @@
 package utilities
 
-func GetMaxUint(a, b uint) uint {
+func GetMaxInt(a, b int) int {
 	if a > b {
 		return a
 	}
 	return b
 }
 
-func GetMinUint(a, b uint) uint {
+func GetMinInt(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func Clamp(value, low, high uint) uint {
+func Clamp(value, low, high int) int {
 	if high < low {
 		low, high = high, low
 	}
-	return GetMinUint(high, GetMaxUint(low, value))
+	return GetMinInt(high, GetMaxInt(low, value))
 }
