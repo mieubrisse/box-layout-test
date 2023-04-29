@@ -18,10 +18,10 @@ const (
 )
 
 // When the child doesn't completely fill the box, where to put the child
-type HorizontalAlignment int
+type HorizontalJustify int
 
 const (
-	Left HorizontalAlignment = iota
+	Left HorizontalJustify = iota
 	Center
 	Right
 )
@@ -39,7 +39,7 @@ type Box struct {
 	// TODO give border corners
 	border lipgloss.Border
 
-	horizontalAlignment HorizontalAlignment
+	horizontalJustify HorizontalJustify
 
 	// TODO put a cache that caches the ContentWidths in between the GetContentWidth and View step
 }
@@ -54,7 +54,7 @@ func New(inner components.Component) Box {
 			Min: components.MinContent,
 			Max: components.MaxContent,
 		},
-		horizontalAlignment: Left,
+		horizontalJustify: Left,
 	}
 }
 
@@ -71,8 +71,8 @@ func (b *Box) SetChildSizeContraint(constraint components.ChildSizeConstraint) {
 	b.childSizeConstraint = constraint
 }
 
-func (b *Box) SetHorizontalAlignment(justify HorizontalAlignment) {
-	b.horizontalAlignment = justify
+func (b *Box) SetHorizontalJustify(justify HorizontalJustify) {
+	b.horizontalJustify = justify
 }
 
 func (b Box) GetContentWidths() (min, max uint) {
@@ -123,8 +123,6 @@ func (b Box) View(width uint) string {
 	// Now expand, to ensure our box still remains the right size in the case of
 	// small strings
 	expandedChildStr := padding.String(truncatedChildStr, spaceAvailableForChild)
-
-	lipgloss.NewStyle().Align()
 
 	// TODO split into left and right pad
 	pad := strings.Repeat(" ", int(b.padding))
