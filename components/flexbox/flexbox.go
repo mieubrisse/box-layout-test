@@ -99,8 +99,6 @@ func (b Flexbox) GetContentWidths() (min, max uint) {
 	return min, max
 }
 
-// TODO set child constraints
-
 func (b Flexbox) View(width uint) string {
 	// TODO caching of views????
 

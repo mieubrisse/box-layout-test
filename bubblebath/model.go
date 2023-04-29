@@ -32,8 +32,6 @@ type bubbleBathModel struct {
 	// Sequences matching String() of tea.KeyMsg that will quit the program
 	quitSequenceSet map[string]bool
 
-	// We put the user's app in a box here so we can give the user top-level control over how their app expands/contracts
-	// relative to the terminal
 	appBox components.Component
 
 	app components.Component
@@ -44,8 +42,10 @@ type bubbleBathModel struct {
 
 // NewBubbleBathModel creates a new tea.Model for tea.NewProgram based off the given InteractiveComponent
 func NewBubbleBathModel(app components.Component, options ...BubbleBathOption) tea.Model {
+	// We put the user's app in a box here so that we can get their app auto-resizing with the terminal
 	appBox := flexbox.New().SetChildren([]flexbox.FlexboxItem{
 		flexbox.NewItem(app).
+			// TODO allow these to be configured?
 			SetMinWidth(flexbox.MinContentWidth).
 			SetMaxWidth(flexbox.MaxAvailableWidth),
 	})

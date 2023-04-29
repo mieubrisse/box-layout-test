@@ -2,22 +2,39 @@ package text
 
 import (
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mieubrisse/box-layout-test/components"
 	"github.com/muesli/reflow/ansi"
 	"strings"
 )
 
-type Text struct {
+// Analogous to the <p> tag in HTML
+type Text interface {
+	components.Component
+
+	GetContents() string
+	SetContents(str string) Text
+}
+
+type textImpl struct {
 	text string
 }
 
-// TODO Private
 func New(text string) Text {
-	return Text{
+	return &textImpl{
 		text: text,
 	}
 }
 
-func (t Text) GetContentWidths() (min, max uint) {
+func (t textImpl) GetContents() string {
+	return t.text
+}
+
+func (t *textImpl) SetContents(str string) Text {
+	t.text = str
+	return t
+}
+
+func (t textImpl) GetContentWidths() (min, max uint) {
 	max = uint(lipgloss.Width(t.text))
 
 	min = 0
@@ -31,6 +48,6 @@ func (t Text) GetContentWidths() (min, max uint) {
 	return
 }
 
-func (t Text) View(width uint) string {
+func (t textImpl) View(width uint) string {
 	return lipgloss.NewStyle().Width(int(width)).Render(t.text)
 }
