@@ -44,12 +44,10 @@ type bubbleBathModel struct {
 
 // NewBubbleBathModel creates a new tea.Model for tea.NewProgram based off the given InteractiveComponent
 func NewBubbleBathModel(app components.Component, options ...BubbleBathOption) tea.Model {
-	appBox := flexbox.New().SetChildren([]*flexbox.FlexboxItem{
-		flexbox.NewItem(app).SetConstraint(
-			flexbox.NewConstraint().
-				SetMin(flexbox.MinContent).
-				SetMax(flexbox.MaxAvailable),
-		),
+	appBox := flexbox.New().SetChildren([]flexbox.FlexboxItem{
+		flexbox.NewItem(app).
+			SetMinWidth(flexbox.MinContent).
+			SetMaxWidth(flexbox.MaxAvailable),
 	})
 	result := &bubbleBathModel{
 		initCmd:         nil,

@@ -15,22 +15,16 @@ func main() {
 	text3 := text.New("This is text 3")
 
 	yourBox := flexbox.New()
-	yourBox.SetChildren([]*flexbox.FlexboxItem{
+	yourBox.SetChildren([]flexbox.FlexboxItem{
 		flexbox.NewItem(text1).
-			SetConstraint(flexbox.NewConstraint().
-				SetMin(flexbox.MaxContent).
-				SetMax(flexbox.MaxAvailable),
-			),
+			SetMinWidth(flexbox.MaxContent).
+			SetMaxWidth(flexbox.MaxAvailable),
 		flexbox.NewItem(text2).
-			SetConstraint(flexbox.NewConstraint().
-				SetMin(flexbox.MaxContent).
-				SetMax(flexbox.MaxAvailable),
-			),
+			SetMinWidth(flexbox.MaxContent).
+			SetMaxWidth(flexbox.MaxAvailable),
 		flexbox.NewItem(text3).
-			SetConstraint(flexbox.NewConstraint().
-				SetMin(flexbox.MaxContent).
-				SetMax(flexbox.MaxAvailable),
-			),
+			SetMinWidth(flexbox.MaxContent).
+			SetMaxWidth(flexbox.MaxAvailable),
 	})
 
 	if _, err := bubblebath.RunBubbleBathProgram(

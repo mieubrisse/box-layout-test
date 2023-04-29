@@ -26,7 +26,7 @@ const (
 // TODO constructor
 
 type Flexbox struct {
-	children []*FlexboxItem
+	children []FlexboxItem
 
 	// TODO make configurable on left and right
 	padding uint
@@ -42,7 +42,7 @@ type Flexbox struct {
 func New() *Flexbox {
 	return &Flexbox{
 		padding:           0,
-		children:          make([]*FlexboxItem, 0),
+		children:          make([]FlexboxItem, 0),
 		border:            lipgloss.Border{},
 		horizontalJustify: Left,
 	}
@@ -59,7 +59,7 @@ func (b *Flexbox) SetBorder(border lipgloss.Border) *Flexbox {
 	return b
 }
 
-func (b *Flexbox) SetChildren(children []*FlexboxItem) *Flexbox {
+func (b *Flexbox) SetChildren(children []FlexboxItem) *Flexbox {
 	b.children = children
 	return b
 }
@@ -134,7 +134,7 @@ func (b Flexbox) View(width uint) string {
 	if spaceAvailableForChildren > maxChildSizeDesired {
 		weights := make([]uint, numChildren)
 		for idx, item := range b.children {
-			if item.constraint.max == MaxAvailable {
+			if item.GetMaxWidth() == MaxAvailable {
 				// TODO use actual weights
 				weights[idx] = 1
 				continue
@@ -151,12 +151,12 @@ func (b Flexbox) View(width uint) string {
 	// Now render each child, ensuring we expand the child's string if the resulting string is less
 	allChildStrs := make([]string, numChildren)
 	for idx, item := range b.children {
-		component := item.component
+		component := item.GetComponent()
 
 		childWidth := childSizes[idx]
 
 		var widthWhenRendering uint
-		switch item.overflowStyle {
+		switch item.GetOverflowStyle() {
 		case Wrap:
 			widthWhenRendering = childWidth
 		case Truncate:
@@ -164,7 +164,7 @@ func (b Flexbox) View(width uint) string {
 			// and then we'll truncate them later
 			widthWhenRendering = maxChildSizes[idx]
 		default:
-			panic(fmt.Sprintf("Unknown overflow style: %v", item.overflowStyle))
+			panic(fmt.Sprintf("Unknown item overflow style: %v", item.GetOverflowStyle()))
 		}
 
 		childStr := component.View(widthWhenRendering)
@@ -212,25 +212,25 @@ func (b Flexbox) calculateAdditionalNonContentWidth() uint {
 
 // Get the possible size ranges for the child, using the child size constraints
 // Max is guaranteed to be >= min
-func getChildSizeRangeUsingConstraints(item *FlexboxItem) (min, max uint) {
-	innerMin, innerMax := item.component.GetContentWidths()
+func getChildSizeRangeUsingConstraints(item FlexboxItem) (min, max uint) {
+	innerMin, innerMax := item.GetComponent().GetContentWidths()
 
-	switch item.constraint.min {
+	switch item.GetMinWidth() {
 	case MinContent:
 		min = innerMin
 	case MaxContent, MaxAvailable:
 		min = innerMax
 	default:
-		panic(fmt.Sprintf("Unknown minimum component size constraint: %v", item.constraint.min))
+		panic(fmt.Sprintf("Unknown minimum item width: %v", item.GetMinWidth()))
 	}
 
-	switch item.constraint.max {
+	switch item.GetMaxWidth() {
 	case MinContent:
 		max = innerMin
 	case MaxContent, MaxAvailable:
 		max = innerMax
 	default:
-		panic(fmt.Sprintf("Unknown maximum component size constraint: %v", item.constraint.max))
+		panic(fmt.Sprintf("Unknown maximum item width: %v", item.GetMaxWidth()))
 	}
 
 	if max < min {
