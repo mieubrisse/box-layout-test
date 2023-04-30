@@ -18,10 +18,13 @@ func (v RenderedContentAssertion) Check(t *testing.T, component components.Compo
 	require.Equal(t, v.ExpectedContent, output)
 }
 
-func GetRenderedContentAssertion(width int, height int, expectedContent string) RenderedContentAssertion {
-	return RenderedContentAssertion{
-		Width:           width,
-		Height:          height,
-		ExpectedContent: expectedContent,
+// This returns an array to make it very easy to slot into FlattenAssertionGroups
+func GetRenderedContentAssertion(width int, height int, expectedContent string) []ComponentAssertion {
+	return []ComponentAssertion{
+		RenderedContentAssertion{
+			Width:           width,
+			Height:          height,
+			ExpectedContent: expectedContent,
+		},
 	}
 }

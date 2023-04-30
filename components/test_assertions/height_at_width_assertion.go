@@ -18,16 +18,20 @@ func (assertion HeightAtWidthAssertion) Check(t *testing.T, component components
 		t,
 		assertion.ExpectedHeight,
 		height,
+		"Expected the component to be height %v at width %v, but was %v",
+		assertion.ExpectedHeight,
+		assertion.Width,
+		height,
 	)
 }
 
 // Helper to create multiple height-at-width assertions
-func GetHeightAtWidthAssertions(dimensions ...int) []HeightAtWidthAssertion {
+func GetHeightAtWidthAssertions(dimensions ...int) []ComponentAssertion {
 	if len(dimensions)%2 != 0 {
 		panic("Must provide dimensions in pairs of (width, height)")
 	}
 
-	result := make([]HeightAtWidthAssertion, len(dimensions)/2)
+	result := make([]ComponentAssertion, 0, len(dimensions)/2)
 	for i := 0; i < len(dimensions); i += 2 {
 		result = append(
 			result,

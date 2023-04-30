@@ -78,12 +78,20 @@ func (t *textImpl) GetContentMinMax() (minWidth int, maxWidth int, minHeight int
 }
 
 func (t textImpl) GetContentHeightForGivenWidth(width int) int {
+	if width == 0 {
+		return 0
+	}
+
 	// TODO cache this?
 	wrapped := wordwrap.String(t.text, width)
 	return lipgloss.Height(wrapped)
 }
 
 func (t textImpl) View(width int, height int) string {
+	if width == 0 || height == 0 {
+		return ""
+	}
+
 	wrapped := wordwrap.String(t.text, width)
 	return lipgloss.NewStyle().Align(lipgloss.Position(t.alignment)).
 		// Width to expand to a block
