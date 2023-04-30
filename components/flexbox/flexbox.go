@@ -8,26 +8,6 @@ import (
 	"strings"
 )
 
-// ========================= NOTE ==============================
-// Flexboxes can go in any direction. I'm going to us "main axis size"
-// and "cross axis size" to refer to these. I'm going to refer to them
-// as "MAS" and "CAS" throughout this piece of code.
-// ========================= NOTE ==============================
-
-type Direction int
-
-const (
-	// Row lays out the flexbox items in a row, left to right
-	// The flex direction will be horizontal
-	// Corresponds to "flex-direction: row" in CSS
-	Row Direction = iota
-
-	// Column lays out the flexbox items in a column, top to bottom
-	// The flex direction will be vertical
-	// Corresponds to "flex-direction: column" in CSS
-	Column
-)
-
 // When the children don't completely fill the box, where to put teh
 // Corresponds to "justify-content" in CSS
 type MainAxisAlignment int
@@ -72,16 +52,20 @@ const (
 type Flexbox struct {
 	children []flexbox_item.FlexboxItem
 
+	direction Direction
+
 	mainAxisAlignment  MainAxisAlignment
 	crossAxisAlignment CrossAxisAlignment
 
 	// -------------------- Calculation Caching -----------------------
-	// Cache of the min/max widths/heights across all children
-	allChildrenDimensionsCache components.DimensionsCache
+	// The widths each child desires (cached between GetContentMinMax and GetContentHeightForGivenWidth
+	desiredChildWidthsCache []int
 
-	// Cached result of calculating child widths in the GetContentHeightForGivenWidth phase
-	// We do this so we
-	childWidthsCalculationCache calculateChildWidthsResult
+	// The actual widths each child will get (cached between GetContentHeightForGivenWidth and View)
+	actualChildWidthsCache axisCalculationResults
+
+	// The desired height each child wants given its width (cached between GetContentHeightForGivenWidth and View)
+	desiredChildHeightsGivenWidthCache []int
 }
 
 // Convenience constructor for a box with a single element
@@ -124,22 +108,18 @@ func (b *Flexbox) GetContentMinMax() (minWidth int, maxWidth int, minHeight int,
 	// TODO allow column layout
 
 	var childrenMinWidth, childrenMaxWidth, childrenMinHeight, childrenMaxHeight int
-	for _, item := range b.children {
+	b.desiredChildWidthsCache = make([]int, len(b.children))
+	for idx, item := range b.children {
 		itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight := item.GetContentMinMax()
+
+		// Cache the item's max width; we'll need it in GetContentHeightForGivenWidth
+		b.desiredChildWidthsCache[idx] = itemMaxWidth
 
 		// Calculate the maxes
 		childrenMinWidth = utilities.GetMaxInt(childrenMinWidth, itemMinWidth)
 		childrenMaxWidth = utilities.GetMaxInt(childrenMaxWidth, itemMaxWidth)
 		childrenMinHeight = utilities.GetMaxInt(childrenMinHeight, itemMinHeight)
 		childrenMaxHeight = utilities.GetMaxInt(childrenMaxHeight, itemMaxHeight)
-
-	}
-
-	b.allChildrenDimensionsCache = components.DimensionsCache{
-		MinWidth:  childrenMinWidth,
-		MaxWidth:  childrenMaxWidth,
-		MinHeight: childrenMinHeight,
-		MaxHeight: childrenMaxHeight,
 	}
 
 	minWidth = childrenMinWidth
@@ -155,30 +135,34 @@ func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
 	// TODO cache this result!!!!
 
 	// Width
-	// TODO CORRECT THIS GUY!!!
-	calculationResult := b.calculateMainAxisWidths(width)
+	actualWidthsCalcResults := b.direction.getActualWidths(b.desiredChildWidthsCache, b.children)
 
-	// Cache the result, so we don't have to do this again during View
-	b.childWidthsCalculationCache = calculationResult
+	// Cache the result, so we don't have to recalculate it in View
+	b.actualChildWidthsCache = actualWidthsCalcResults
 
-	maxDesiredItemHeight := 0
+	result := 0
+	desiredHeights := make([]int, len(b.children))
 	for idx, item := range b.children {
-		itemWidth := calculationResult.childWidths[idx]
-		desiredItemHeight := item.GetContentHeightForGivenWidth(itemWidth)
+		actualWidth := actualWidthsCalcResults.actualSizes[idx]
+		desiredHeight := item.GetContentHeightForGivenWidth(actualWidth)
 
-		maxDesiredItemHeight = utilities.GetMaxInt(desiredItemHeight, maxDesiredItemHeight)
+		desiredHeights[idx] = desiredHeight
+		result = utilities.GetMaxInt(result, desiredHeight)
 	}
 
-	return maxDesiredItemHeight
+	// Cache the result, so we don't have to recalculate it in View
+	b.desiredChildHeightsGivenWidthCache = desiredHeights
+
+	return result
 }
 
 func (b *Flexbox) View(width int, height int) string {
 	// Width
-	widthNotUsedByChildren := width - b.childWidthsCalculationCache.totalWidthUsed
+	widthNotUsedByChildren := width - b.actualChildWidthsCache.totalWidthUsed
 
 	// Height
 	childHeights, maxHeightUsedByChildren := b.calculateCrossAxisHeights(
-		b.childWidthsCalculationCache.childWidths,
+		b.actualChildWidthsCache.childWidths,
 		height,
 	)
 	heightNotUsedByChildren := height - maxHeightUsedByChildren
@@ -186,7 +170,7 @@ func (b *Flexbox) View(width int, height int) string {
 	// Now render each child, ensuring we expand the child's string if the resulting string is less
 	allContentFragments := make([]string, len(b.children))
 	for idx, item := range b.children {
-		childWidth := b.childWidthsCalculationCache.childWidths[idx]
+		childWidth := b.actualChildWidthsCache.childWidths[idx]
 		childHeight := childHeights[idx]
 		childStr := item.View(childWidth, childHeight)
 
