@@ -37,12 +37,14 @@ func (s styleboxImpl) GetStyle() lipgloss.Style {
 func (s styleboxImpl) SetStyle(style lipgloss.Style) Stylebox {
 	s.style = style.Copy().
 		UnsetMargins().
+		UnsetAlign().
+		UnsetAlignHorizontal().
+		UnsetAlignVertical().
 		UnsetWidth().
 		UnsetMaxWidth().
 		UnsetHeight().
 		UnsetMaxHeight().
-		UnsetInline().
-		UnsetAlign()
+		UnsetInline()
 	return s
 }
 
@@ -64,6 +66,10 @@ func (s styleboxImpl) GetContentHeightForGivenWidth(width int) int {
 }
 
 func (s styleboxImpl) View(width int, height int) string {
+	if width == 0 || height == 0 {
+		return ""
+	}
+
 	innerWidth := utilities.GetMaxInt(0, width-s.style.GetHorizontalFrameSize())
 	innerHeight := utilities.GetMaxInt(0, height-s.style.GetVerticalFrameSize())
 	innerStr := s.component.View(innerWidth, innerHeight)
