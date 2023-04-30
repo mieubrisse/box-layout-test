@@ -1,48 +1,58 @@
 package text
 
 import (
-	"github.com/mieubrisse/box-layout-test/components"
-	"github.com/stretchr/testify/require"
+	"github.com/mieubrisse/box-layout-test/components/test_assertions"
 	"testing"
 )
-
-type componentMinMaxSizeAssertion struct {
-	minWidth  int
-	maxWidth  int
-	minHeight int
-	maxHeight int
-}
-
-func (assertion componentMinMaxSizeAssertion) validate(t *testing.T, component components.Component) {
-	minWidth, maxWidth, minHeight, maxHeight := component.GetContentMinMax()
-	require.Equal(t, assertion.minWidth, minWidth)
-	require.Equal(t, assertion.maxWidth, maxWidth)
-	require.Equal(t, assertion.minHeight, minHeight)
-	require.Equal(t, assertion.maxHeight, maxHeight)
-}
-
-type componentHeightAtWidthAssertion struct {
-	width  int
-	height int
-}
-
-func (assertion componentHeightAtWidthAssertion) validate(t *testing.T, component components.Component) {
-	height := component.GetContentHeightForGivenWidth(assertion.width)
-	require.Equal(
-		t,
-		assertion.height,
-		height,
-	)
-}
 
 func TestShortString(t *testing.T) {
 	text := New("This is a short string")
 
-	assertion := componentMinMaxSizeAssertion{
-		minWidth:  6,
-		maxWidth:  22,
-		minHeight: 1,
-		maxHeight: 4,
+	var ints []int
+	var subints []int
+	var subints2 []int
+	ints = append(ints, subints..., subints2...)
+
+	var assertions []test_assertions.ComponentAssertion
+	assertions = append(assertions, test_assertions.GetContentSizeAssertions(6, 22, 1, 4)
+	assertions = append(assertions, test_assertions.GetHeightAtWidthAssertions(
+		0, 0, // invisible
+		6, 4, // min content width
+		8, 2, // in the middle
+		22, 1, // max content width
+		100, 1, // beyond max content width
+	))
+	assertions = append()
+
+	[]test_assertions.ComponentAssertion{
+		test_assertions.ContentSizeAssertion{
+			ExpectedMinWidth:  6,
+			ExpectedMaxWidth:  22,
+			ExpectedMinHeight: 1,
+			ExpectedMaxHeight: 4,
+		},
+		// Invisible
+		test_assertions.HeightAtWidthAssertion{},
+		// Min content width
+		test_assertions.HeightAtWidthAssertion{
+			Width:          6,
+			ExpectedHeight: 4,
+		},
+		// In the middle
+		test_assertions.HeightAtWidthAssertion{
+			Width:          22,
+			ExpectedHeight: 1,
+		},
+		// Max content width
+		test_assertions.HeightAtWidthAssertion{
+			Width:          22,
+			ExpectedHeight: 1,
+		},
+		// Beyond max
+		test_assertions.HeightAtWidthAssertion{
+			Width:          100,
+			ExpectedHeight: 1,
+		},
 	}
 
 	// Verify that sizes don't change based off the align
@@ -61,11 +71,11 @@ func TestShortString(t *testing.T) {
 func TestShortString(t *testing.T) {
 	text := New("This is a short string")
 
-	assertion := componentMinMaxSizeAssertion{
-		minWidth:  6,
-		maxWidth:  22,
-		minHeight: 1,
-		maxHeight: 4,
+	assertion := ComponentMinMaxSizeAssertion{
+		MinWidth:  6,
+		MaxWidth:  22,
+		MinHeight: 1,
+		MaxHeight: 4,
 	}
 
 	// Verify that sizes don't change based off the align
