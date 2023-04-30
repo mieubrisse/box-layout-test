@@ -143,7 +143,9 @@ func (b *Flexbox) GetContentMinMax() (minWidth int, maxWidth int, minHeight int,
 }
 
 func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
-	// TODO cache this result!!!!
+	if width == 0 {
+		return 0
+	}
 
 	// Width
 	actualWidthsCalcResults := b.direction.getActualWidths(b.desiredChildWidthsCache, b.children, width)
@@ -168,6 +170,10 @@ func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
 }
 
 func (b *Flexbox) View(width int, height int) string {
+	if width == 0 || height == 0 {
+		return ""
+	}
+
 	actualWidths := b.actualChildWidthsCache.actualSizes
 	// widthNotUsedByChildren := utilities.GetMaxInt(0, width-b.actualChildWidthsCache.spaceUsedByChildren)
 
