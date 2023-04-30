@@ -3,14 +3,28 @@ package flexbox
 import (
 	"github.com/mieubrisse/box-layout-test/components"
 	"github.com/mieubrisse/box-layout-test/components/flexbox_item"
-	"github.com/mieubrisse/box-layout-test/utilities"
 )
 
 // NOTE: This class does some stateful caching, so when you're testing methods like "View" make sure you call the
 // full flow of GetContentMinMax -> GetContentHeightForGivenWidth -> View as necessary
 
-// TODO make an interface
-type Flexbox struct {
+type Flexbox interface {
+	components.Component
+
+	GetChildren() []flexbox_item.FlexboxItem
+	SetChildren(children []flexbox_item.FlexboxItem) Flexbox
+
+	GetDirection() Direction
+	SetDirection(direction Direction) Flexbox
+
+	GetHorizontalAlignment() AxisAlignment
+	SetHorizontalAlignment(alignment AxisAlignment) Flexbox
+
+	GetVerticalAlignment() AxisAlignment
+	SetVerticalAlignment(alignment AxisAlignment) Flexbox
+}
+
+type flexboxImpl struct {
 	children []flexbox_item.FlexboxItem
 
 	direction Direction
@@ -27,7 +41,7 @@ type Flexbox struct {
 }
 
 // Convenience constructor for a box with a single element
-func NewWithContent(component components.Component, opts ...flexbox_item.FlexboxItemOpt) *Flexbox {
+func NewWithContent(component components.Component, opts ...flexbox_item.FlexboxItemOpt) Flexbox {
 	item := flexbox_item.New(component)
 	for _, opt := range opts {
 		opt(item)
@@ -36,12 +50,12 @@ func NewWithContent(component components.Component, opts ...flexbox_item.Flexbox
 }
 
 // Convenience constructor for a box with multiple elements
-func NewWithContents(items ...flexbox_item.FlexboxItem) *Flexbox {
+func NewWithContents(items ...flexbox_item.FlexboxItem) Flexbox {
 	return New().SetChildren(items)
 }
 
-func New() *Flexbox {
-	return &Flexbox{
+func New() Flexbox {
+	return &flexboxImpl{
 		children:                           make([]flexbox_item.FlexboxItem, 0),
 		direction:                          Row,
 		horizontalAlignment:                AlignStart,
@@ -51,31 +65,62 @@ func New() *Flexbox {
 	}
 }
 
-func (b *Flexbox) SetChildren(children []flexbox_item.FlexboxItem) *Flexbox {
+func (b *flexboxImpl) GetChildren() []flexbox_item.FlexboxItem {
+	return b.children
+}
+
+func (b *flexboxImpl) SetChildren(children []flexbox_item.FlexboxItem) Flexbox {
 	b.children = children
 	return b
 }
 
-func (b *Flexbox) SetDirection(direction Direction) *Flexbox {
+func (b *flexboxImpl) GetDirection() Direction {
+	return b.direction
+}
+
+func (b *flexboxImpl) SetDirection(direction Direction) Flexbox {
 	b.direction = direction
 	return b
 }
 
-func (b *Flexbox) SetHorizontalAlignment(alignment AxisAlignment) *Flexbox {
+func (b flexboxImpl) GetHorizontalAlignment() AxisAlignment {
+	return b.horizontalAlignment
+}
+
+func (b *flexboxImpl) SetHorizontalAlignment(alignment AxisAlignment) Flexbox {
 	b.horizontalAlignment = alignment
 	return b
 }
 
-func (b *Flexbox) SetVerticalAlignment(alignment AxisAlignment) *Flexbox {
+func (b flexboxImpl) GetVerticalAlignment() AxisAlignment {
+	return b.verticalAlignment
+}
+
+func (b *flexboxImpl) SetVerticalAlignment(alignment AxisAlignment) Flexbox {
 	b.verticalAlignment = alignment
 	return b
 }
 
-func (b *Flexbox) GetContentMinMax() (minWidth int, maxWidth int, minHeight int, maxHeight int) {
-	return b.direction.getContentSizes(b.children)
+func (b *flexboxImpl) GetContentMinMax() (int, int, int, int) {
+	numChildren := len(b.children)
+	childMinWidths := make([]int, numChildren)
+	childMaxWidths := make([]int, numChildren)
+	childMinHeights := make([]int, numChildren)
+	childMaxHeights := make([]int, numChildren)
+	for idx, item := range b.children {
+		childMinWidths[idx], childMaxWidths[idx], childMinHeights[idx], childMaxHeights[idx] = item.GetContentMinMax()
+	}
+
+	minWidth := b.direction.reduceChildWidths(childMinWidths)
+	maxWidth := b.direction.reduceChildWidths(childMaxWidths)
+
+	minHeight := b.direction.reduceChildHeights(childMinHeights)
+	maxHeight := b.direction.reduceChildHeights(childMaxHeights)
+
+	return minWidth, maxWidth, minHeight, maxHeight
 }
 
-func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
+func (b *flexboxImpl) GetContentHeightForGivenWidth(width int) int {
 	if width == 0 {
 		return 0
 	}
@@ -92,23 +137,21 @@ func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
 	// Cache the result, so we don't have to recalculate it in View
 	b.actualChildWidthsCache = actualWidthsCalcResults
 
-	result := 0
 	desiredHeights := make([]int, len(b.children))
 	for idx, item := range b.children {
 		actualWidth := actualWidthsCalcResults.actualSizes[idx]
 		desiredHeight := item.GetContentHeightForGivenWidth(actualWidth)
 
 		desiredHeights[idx] = desiredHeight
-		result = utilities.GetMaxInt(result, desiredHeight)
 	}
 
 	// Cache the result, so we don't have to recalculate it in View
 	b.desiredChildHeightsGivenWidthCache = desiredHeights
 
-	return result
+	return b.direction.reduceChildHeights(desiredHeights)
 }
 
-func (b *Flexbox) View(width int, height int) string {
+func (b *flexboxImpl) View(width int, height int) string {
 	if width == 0 || height == 0 {
 		return ""
 	}
@@ -137,51 +180,5 @@ func (b *Flexbox) View(width int, height int) string {
 
 	content := b.direction.renderContentFragments(allContentFragments, width, height, b.horizontalAlignment, b.verticalAlignment)
 
-	/*
-		// Justify main axis
-		switch b.horizontalAlignment {
-		case AlignStart:
-			pad := strings.Repeat(" ", widthNotUsedByChildren)
-			content += pad
-		case AlignEnd:
-			pad := strings.Repeat(" ", widthNotUsedByChildren)
-			content = pad + content
-		case AlignCenter:
-			leftPadSize := widthNotUsedByChildren / 2
-			rightPadSize := widthNotUsedByChildren - leftPadSize
-			leftPad := strings.Repeat(" ", leftPadSize)
-			rightPad := strings.Repeat(" ", rightPadSize)
-
-			newContentFragments := append([]string{leftPad}, allContentFragments...)
-			newContentFragments = append(newContentFragments, rightPad)
-			allContentFragments = newContentFragments
-		}
-
-		// Justify cross axis
-		var content string
-		switch b.verticalAlignment {
-		case AlignStart:
-			content = lipgloss.JoinHorizontal(lipgloss.Top, allContentFragments...)
-			content += strings.Repeat("\n", heightNotUsedByChildren)
-		case AlignEnd:
-			content = lipgloss.JoinHorizontal(lipgloss.Bottom, allContentFragments...)
-			content = strings.Repeat("\n", heightNotUsedByChildren) + content
-		case AlignCenter:
-			content = lipgloss.JoinHorizontal(lipgloss.Center, allContentFragments...)
-			topPadSize := heightNotUsedByChildren / 2
-			bottomPadSize := heightNotUsedByChildren - topPadSize
-			topPad := strings.Repeat("\n", topPadSize)
-			bottomPad := strings.Repeat("\n", bottomPadSize)
-			content = topPad + content + bottomPad
-		}
-
-	*/
-
 	return content
 }
-
-// ====================================================================================================
-//
-//	Private Helper Functions
-//
-// ====================================================================================================

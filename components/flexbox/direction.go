@@ -2,21 +2,13 @@ package flexbox
 
 import (
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mieubrisse/box-layout-test/components/flexbox_item"
 )
 
 // The direction that the flexbox ought to be layed out in
 type Direction interface {
-	// The functions in this interface are used internally in the flexbox to do its calculations
+	reduceChildWidths(childWidths []int) int
 
-	/*
-		getMainAxisMaxDimensionValue(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue
-
-		getCrossAxisMaxDimensionValue(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue
-
-	*/
-
-	getContentSizes(items []flexbox_item.FlexboxItem) (minWidth, maxWidth, minHeight, maxHeight int)
+	reduceChildHeights(childHeights []int) int
 
 	getActualWidths(desiredWidths []int, shouldGrow []bool, widthAvailable int) axisSizeCalculationResults
 
@@ -31,8 +23,8 @@ type Direction interface {
 var Row = &directionImpl{
 	actualWidthCalculator:  calculateActualMainAxisSizes,
 	actualHeightCalculator: calculateActualCrossAxisSizes,
-	minMaxWidthCombiner:    mainAxisDimensionMinMaxCombiner,
-	minMaxHeightCombiner:   crossAxisDimensionMinMaxCombiner,
+	widthDimensionReducer:  mainAxisDimensionReducer,
+	heightDimensionReducer: crossAxisDimensionReducer,
 	contentFragmentRenderer: func(contentFragments []string, width int, height int, horizontalAlign AxisAlignment, verticalAlign AxisAlignment) string {
 		joined := lipgloss.JoinHorizontal(lipgloss.Position(verticalAlign), contentFragments...)
 		horizontallyPlaced := lipgloss.PlaceHorizontal(width, lipgloss.Position(horizontalAlign), joined)
@@ -46,8 +38,8 @@ var Row = &directionImpl{
 var Column = &directionImpl{
 	actualWidthCalculator:  calculateActualCrossAxisSizes,
 	actualHeightCalculator: calculateActualMainAxisSizes,
-	minMaxWidthCombiner:    crossAxisDimensionMinMaxCombiner,
-	minMaxHeightCombiner:   mainAxisDimensionMinMaxCombiner,
+	widthDimensionReducer:  crossAxisDimensionReducer,
+	heightDimensionReducer: mainAxisDimensionReducer,
 	contentFragmentRenderer: func(contentFragments []string, width int, height int, horizontalAlign AxisAlignment, verticalAlign AxisAlignment) string {
 		joined := lipgloss.JoinVertical(lipgloss.Position(horizontalAlign), contentFragments...)
 		horizontallyPlaced := lipgloss.PlaceHorizontal(width, lipgloss.Position(horizontalAlign), joined)
@@ -63,24 +55,17 @@ var Column = &directionImpl{
 type directionImpl struct {
 	actualWidthCalculator   axisSizeCalculator
 	actualHeightCalculator  axisSizeCalculator
-	minMaxWidthCombiner     axisDimensionMinMaxCombiner
-	minMaxHeightCombiner    axisDimensionMinMaxCombiner
+	widthDimensionReducer   axisDimensionMinMaxCombiner
+	heightDimensionReducer  axisDimensionMinMaxCombiner
 	contentFragmentRenderer func(contentFragments []string, width int, height int, horizontalAlign AxisAlignment, verticalAlign AxisAlignment) string
 }
 
-func (a directionImpl) getContentSizes(items []flexbox_item.FlexboxItem) (int, int, int, int) {
-	childMinWidths := make([]int, len(items))
-	childMaxWidths := make([]int, len(items))
-	childMinHeights := make([]int, len(items))
-	childMaxHeights := make([]int, len(items))
-	for idx, item := range items {
-		childMinWidths[idx], childMaxWidths[idx], childMinHeights[idx], childMaxHeights[idx] = item.GetContentMinMax()
-	}
+func (a directionImpl) reduceChildWidths(childWidths []int) int {
+	return a.widthDimensionReducer(childWidths)
+}
 
-	minWidth, maxWidth := a.minMaxWidthCombiner(childMinWidths, childMaxWidths)
-	minHeight, maxHeight := a.minMaxHeightCombiner(childMinHeights, childMaxHeights)
-
-	return minWidth, maxWidth, minHeight, maxHeight
+func (a directionImpl) reduceChildHeights(childHeights []int) int {
+	return a.heightDimensionReducer(childHeights)
 }
 
 func (r directionImpl) getActualWidths(desiredWidths []int, shouldGrow []bool, widthAvailable int) axisSizeCalculationResults {

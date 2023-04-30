@@ -6,8 +6,9 @@ import (
 	"github.com/mieubrisse/box-layout-test/utilities"
 )
 
-// Stylebox is a box explicitly for controlling style
-// No other elements control style
+// Stylebox is a box explicitly for controlling an element's style
+// No other elements control style; this is intentional so that
+// it's clear where exactly style is getting changed
 type Stylebox interface {
 	components.Component
 
