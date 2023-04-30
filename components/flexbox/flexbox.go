@@ -8,25 +8,64 @@ import (
 	"strings"
 )
 
-// TODO make this "main axis justify"
-// When the child doesn't completely fill the box, where to put the child
-type HorizontalJustify int
+// ========================= NOTE ==============================
+// Flexboxes can go in any direction. I'm going to us "main axis size"
+// and "cross axis size" to refer to these. I'm going to refer to them
+// as "MAS" and "CAS" throughout this piece of code.
+// ========================= NOTE ==============================
+
+type Direction int
 
 const (
-	Left HorizontalJustify = iota
+	// Row lays out the flexbox items in a row, left to right
+	// The flex direction will be horizontal
+	// Corresponds to "flex-direction: row" in CSS
+	Row Direction = iota
 
-	// NOTE: in order to see this in effect, you must have
-	Center
-	Right
+	// Column lays out the flexbox items in a column, top to bottom
+	// The flex direction will be vertical
+	// Corresponds to "flex-direction: column" in CSS
+	Column
 )
 
-// When the child's height doesn't completely fill the box, where to put the child
-type VerticalJustify int
+// When the children don't completely fill the box, where to put teh
+// Corresponds to "justify-content" in CSS
+type MainAxisAlignment int
 
 const (
-	Top VerticalJustify = iota
-	Middle
-	Bottom
+	// Elements will be at the start of the flexbox (as determined by the Direction)
+	// Corresponds to "flex-justify: flex-start"
+	MainAxisStart MainAxisAlignment = iota
+
+	// NOTE: in order to see this in effect, you must have
+	// Corresponds to "flex-justify: center"
+	MainAxisCenter
+
+	// Elements will be pushed to the end of the flexbox (as determined by the Direction)
+	// Corresponds to "flex-justify: flex-end"
+	MainAxisEnd
+
+	// TODO space-between, space-around, space-evenly: https://css-tricks.com/snippets/css/a-guide-to-flexbox/
+)
+
+// CrossAxisAlignment controls where to put children when the child's height doesn't completely fill the cross axis
+// Corresponds to "align-items" in CSS
+type CrossAxisAlignment int
+
+const (
+	// CrossAxisStart arranges items at the start of the cross axis, when there is extra space
+	// E.g. when the flexbox direction is horizontal, this will push items to the top
+	// Coreresponds to "align-items: flex-start" in CSS
+	CrossAxisStart CrossAxisAlignment = iota
+
+	// CrossAxisMiddle arranges items in the center of the cross axis, when there is extra space
+	// E.g. when the flexbox direction is horizontal, this will push items to the top
+	// Coreresponds to "align-items: center" in CSS
+	CrossAxisMiddle
+
+	// CrossAxisEnd arranges items at the end of the cross axis, when there is extra space
+	// Coreresponds to "align-items: flex-end" in CSS
+	CrossAxisEnd
 )
 
 // TODO make an interface
@@ -38,8 +77,8 @@ type Flexbox struct {
 
 	border lipgloss.Border
 
-	horizontalJustify HorizontalJustify
-	verticalJustify   VerticalJustify
+	horizontalJustify MainAxisAlignment
+	verticalJustify   CrossAxisAlignment
 
 	// -------------------- Calculation Caching -----------------------
 	// Cache of the min/max widths/heights across all children
@@ -69,7 +108,7 @@ func New() *Flexbox {
 		padding:           0,
 		children:          make([]flexbox_item.FlexboxItem, 0),
 		border:            lipgloss.Border{},
-		horizontalJustify: Left,
+		horizontalJustify: MainAxisStart,
 	}
 }
 
@@ -89,12 +128,12 @@ func (b *Flexbox) SetChildren(children []flexbox_item.FlexboxItem) *Flexbox {
 	return b
 }
 
-func (b *Flexbox) SetHorizontalJustify(justify HorizontalJustify) *Flexbox {
+func (b *Flexbox) SetHorizontalJustify(justify MainAxisAlignment) *Flexbox {
 	b.horizontalJustify = justify
 	return b
 }
 
-func (b *Flexbox) SetVerticalJustify(justify VerticalJustify) *Flexbox {
+func (b *Flexbox) SetVerticalJustify(justify CrossAxisAlignment) *Flexbox {
 	b.verticalJustify = justify
 	return b
 }
@@ -138,7 +177,7 @@ func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
 	// Width
 	nonContentWidthNeeded := b.calculateAdditionalNonContentWidth()
 	widthAvailableForChildren := utilities.GetMaxInt(0, width-nonContentWidthNeeded)
-	calculationResult := b.calculateChildWidths(widthAvailableForChildren)
+	calculationResult := b.calculateMainAxisWidths(widthAvailableForChildren)
 
 	// Cache the result, so we don't have to do this again during View
 	b.childWidthsCalculationCache = calculationResult
@@ -182,13 +221,13 @@ func (b *Flexbox) View(width int, height int) string {
 
 	// Justify horizontally
 	switch b.horizontalJustify {
-	case Left:
+	case MainAxisStart:
 		pad := strings.Repeat(" ", widthNotUsedByChildren)
 		allContentFragments = append(allContentFragments, pad)
-	case Right:
+	case MainAxisEnd:
 		pad := strings.Repeat(" ", widthNotUsedByChildren)
 		allContentFragments = append([]string{pad}, allContentFragments...)
-	case Center:
+	case MainAxisCenter:
 		leftPadSize := widthNotUsedByChildren / 2
 		rightPadSize := widthNotUsedByChildren - leftPadSize
 		leftPad := strings.Repeat(" ", leftPadSize)
@@ -204,13 +243,13 @@ func (b *Flexbox) View(width int, height int) string {
 	// Justify vertically
 	var content string
 	switch b.verticalJustify {
-	case Top:
+	case CrossAxisStart:
 		content = lipgloss.JoinHorizontal(lipgloss.Top, allContentFragments...)
 		content += strings.Repeat("\n", heightNotUsedByChildren)
-	case Bottom:
+	case CrossAxisEnd:
 		content = lipgloss.JoinHorizontal(lipgloss.Bottom, allContentFragments...)
 		content = strings.Repeat("\n", heightNotUsedByChildren) + content
-	case Middle:
+	case CrossAxisMiddle:
 		content = lipgloss.JoinHorizontal(lipgloss.Center, allContentFragments...)
 		topPadSize := heightNotUsedByChildren / 2
 		bottomPadSize := heightNotUsedByChildren - topPadSize
@@ -321,7 +360,80 @@ func addSpaceByWeight(spaceToAllocate int, inputSizes []int, weights []int) []in
 	return result
 }
 
-func (b Flexbox) calculateChildWidths(widthAvailableForChildren int) calculateChildWidthsResult {
+// Calculates
+func (b Flexbox) calculateMainAxisItemSizes(mins []int, maxes []int) ([]int, int) {
+	// First, add up the space each item would like in a perfect world
+	totalMinSpaceDesired := 0 // Under this value, the flexbox will simply truncate
+	totalMaxSpaceDesired := 0 // Above this value, only the items that have MaxAvailable set for this dimension will expand
+
+	// First, add up the total width the items would like in a perfect world
+	childWidths := make([]int, numChildren)
+	maxConstrainedChildWidths := make([]int, numChildren)
+	for idx, item := range b.children {
+		itemMinWidth, itemMaxWidth, _, _ := item.GetContentMinMax()
+
+		totalMinWidthDesired += itemMinWidth
+		totalMaxWidthDesired += itemMaxWidth
+
+		childWidths[idx] = itemMinWidth
+		maxConstrainedChildWidths[idx] = itemMaxWidth
+	}
+
+	// When min_desired_size < space_available < max_desired_size, scale everyone up equally between their
+	// min and max sizes
+	if widthAvailableForChildren > totalMinWidthDesired {
+		weights := make([]int, numChildren)
+		for idx, minChildSize := range childWidths {
+			maxChildSize := maxConstrainedChildWidths[idx]
+			childExpansionRange := maxChildSize - minChildSize
+			weights[idx] = childExpansionRange
+		}
+
+		spaceToDistributeEvenly := utilities.GetMinInt(
+			widthAvailableForChildren-totalMinWidthDesired,
+			totalMaxWidthDesired-totalMinWidthDesired,
+		)
+
+		childWidths = addSpaceByWeight(spaceToDistributeEvenly, childWidths, weights)
+	}
+
+	// When width > max_desired_size, continue to scale only the elements whose max size is MaxAvailable
+	if widthAvailableForChildren > totalMaxWidthDesired {
+		weights := make([]int, numChildren)
+		for idx, item := range b.children {
+			if item.GetMaxWidth().ShouldGrow() {
+				// TODO use actual weights
+				weights[idx] = 1
+				continue
+			}
+
+			weights[idx] = 0
+		}
+
+		spaceToDistributeToExpanders := widthAvailableForChildren - totalMaxWidthDesired
+
+		childWidths = addSpaceByWeight(spaceToDistributeToExpanders, childWidths, weights)
+	}
+
+	// Finally, ensure that the child widths don't exceed our available space
+	totalWidthUsed := int(0)
+	widthAvailable := widthAvailableForChildren
+	for idx, childWidth := range childWidths {
+		actualWidth := utilities.GetMinInt(widthAvailable, childWidth)
+		childWidths[idx] = actualWidth
+
+		widthAvailable -= actualWidth
+		totalWidthUsed += actualWidth
+	}
+
+	return calculateChildWidthsResult{
+		childWidths:    childWidths,
+		totalWidthUsed: totalWidthUsed,
+	}
+}
+
+// Calculates the sizes for children
+func (b Flexbox) calculateMainAxisWidths(widthAvailableForChildren int) calculateChildWidthsResult {
 
 	numChildren := len(b.children)
 
