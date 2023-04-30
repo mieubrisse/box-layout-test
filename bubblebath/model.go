@@ -47,8 +47,10 @@ func NewBubbleBathModel(app components.Component, options ...BubbleBathOption) t
 	appBox := flexbox.New().SetChildren([]flexbox_item.FlexboxItem{
 		flexbox_item.NewItem(app).
 			// TODO allow these to be configured?
-			SetMinWidth(flexbox_item.MinContentWidth).
-			SetMaxWidth(flexbox_item.MaxAvailableWidth),
+			SetMinWidth(flexbox_item.MinContent).
+			SetMaxWidth(flexbox_item.MaxAvailable).
+			SetMinHeight(flexbox_item.MinContent).
+			SetMaxHeight(flexbox_item.MaxAvailable),
 	})
 	result := &bubbleBathModel{
 		initCmd:         nil,
@@ -68,7 +70,7 @@ func (b bubbleBathModel) Init() tea.Cmd {
 	return b.initCmd
 }
 
-func (b bubbleBathModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (b *bubbleBathModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if _, found := b.quitSequenceSet[msg.String()]; found {
@@ -86,7 +88,12 @@ func (b bubbleBathModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return b, nil
 }
 
-func (b bubbleBathModel) View() string {
+func (b *bubbleBathModel) View() string {
+	// We call these without using the results because:
+	// 1) this is the three-phase cycle of our component rendering
+	// 2) some components do caching of the phases, so to kick the cycle off we want to make sure we call them all
+	b.appBox.GetContentMinMax()
+	b.appBox.GetContentHeightForGivenWidth(b.width)
 	return b.appBox.View(b.width, b.height)
 }
 
@@ -104,7 +111,7 @@ func RunBubbleBathProgram[T components.Component](
 	model := NewBubbleBathModel(appComponent, bubbleBathOptions...)
 
 	finalModel, err := tea.NewProgram(model, teaOptions...).Run()
-	castedModel := finalModel.(bubbleBathModel)
+	castedModel := finalModel.(*bubbleBathModel)
 	castedAppComponent := castedModel.app.(T)
 	return castedAppComponent, err
 }

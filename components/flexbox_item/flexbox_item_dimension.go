@@ -17,7 +17,7 @@ func (dimensionValue FlexboxItemDimensionValue) ShouldGrow() bool {
 // Indicates a size == the minimum content size of the item, which:
 // - For width is the size of the item if all wrapping opportunities are taken (basically, the length of the longest word)
 // - For height is the height of the item when no word-wrapping is done
-var MinContentWidth = FlexboxItemDimensionValue{
+var MinContent = FlexboxItemDimensionValue{
 	sizeRetriever: func(min, max int) int {
 		return min
 	},
@@ -27,7 +27,7 @@ var MinContentWidth = FlexboxItemDimensionValue{
 // Indicates a size == the maximum content of the item, which is the size of the item without any wrapping applied
 // - For width, this is basically, the length of the longest line
 // - For height, this is the height of the item when the maximum possible word-wrapping is done
-var MaxContentWidth = FlexboxItemDimensionValue{
+var MaxContent = FlexboxItemDimensionValue{
 	sizeRetriever: func(min, max int) int {
 		return max
 	},
@@ -35,7 +35,7 @@ var MaxContentWidth = FlexboxItemDimensionValue{
 }
 
 // Indicates a size == the maximum amount of space available (including extra space)
-var MaxAvailableWidth = FlexboxItemDimensionValue{
+var MaxAvailable = FlexboxItemDimensionValue{
 	sizeRetriever: func(min, max int) int {
 		return max
 	},

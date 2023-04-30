@@ -54,12 +54,20 @@ func (t *textImpl) GetContentMinMax() (minWidth int, maxWidth int, minHeight int
 	return
 }
 
+func (t textImpl) GetContentHeightForGivenWidth(width int) int {
+	// TODO cache this?
+	wrapped := wordwrap.String(t.text, width)
+	return lipgloss.Height(wrapped)
+}
+
 func (t textImpl) View(width int, height int) string {
+	wrapped := wordwrap.String(t.text, width)
 	return lipgloss.NewStyle().
+		// Width to expand to a block
 		Width(width).
-		// The only overflow behaviour we can support is truncate
+		// Truncate (we can't support overrun or any other behaviours)
 		MaxHeight(height).
-		Render(t.text)
+		Render(wrapped)
 }
 
 // ====================================================================================================

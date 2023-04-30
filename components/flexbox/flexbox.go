@@ -14,16 +14,24 @@ type HorizontalJustify int
 
 const (
 	Left HorizontalJustify = iota
+
+	// NOTE: in order to see this in effect, you must have
 	Center
 	Right
+)
+
+// When the child's height doesn't completely fill the box, where to put the child
+type VerticalJustify int
+
+const (
+	Top VerticalJustify = iota
+	Middle
+	Bottom
 )
 
 // TODO make an interface
 type Flexbox struct {
 	children []flexbox_item.FlexboxItem
-
-	// Cache of the min/max widths/heights across all children
-	allChildrenDimensionsCache components.DimensionsCache
 
 	// TODO make configurable on left and right
 	padding int
@@ -31,6 +39,15 @@ type Flexbox struct {
 	border lipgloss.Border
 
 	horizontalJustify HorizontalJustify
+	verticalJustify   VerticalJustify
+
+	// -------------------- Calculation Caching -----------------------
+	// Cache of the min/max widths/heights across all children
+	allChildrenDimensionsCache components.DimensionsCache
+
+	// Cached result of calculating child widths in the GetContentHeightForGivenWidth phase
+	// We do this so we
+	childWidthsCalculationCache calculateChildWidthsResult
 }
 
 // Convenience constructor for a box with a single element
@@ -77,6 +94,11 @@ func (b *Flexbox) SetHorizontalJustify(justify HorizontalJustify) *Flexbox {
 	return b
 }
 
+func (b *Flexbox) SetVerticalJustify(justify VerticalJustify) *Flexbox {
+	b.verticalJustify = justify
+	return b
+}
+
 func (b *Flexbox) GetContentMinMax() (minWidth int, maxWidth int, minHeight int, maxHeight int) {
 	// TODO allow column layout
 
@@ -110,54 +132,92 @@ func (b *Flexbox) GetContentMinMax() (minWidth int, maxWidth int, minHeight int,
 	return
 }
 
-func (b Flexbox) View(width int, height int) string {
-	// TODO caching of views????
+func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
+	// TODO cache this result!!!!
 
+	// Width
 	nonContentWidthNeeded := b.calculateAdditionalNonContentWidth()
-	// TODO margin
 	widthAvailableForChildren := utilities.GetMaxInt(0, width-nonContentWidthNeeded)
+	calculationResult := b.calculateChildWidths(widthAvailableForChildren)
 
-	childWidths, totalWidthUsedByChildren := b.calculateChildWidths(widthAvailableForChildren)
-	widthNotUsedByChildren := widthAvailableForChildren - totalWidthUsedByChildren
+	// Cache the result, so we don't have to do this again during View
+	b.childWidthsCalculationCache = calculationResult
 
-	// TODO allow different types of expansion in cross axis
+	maxDesiredItemHeight := 0
+	for idx, item := range b.children {
+		itemWidth := calculationResult.childWidths[idx]
+		desiredItemHeight := item.GetContentHeightForGivenWidth(itemWidth)
+
+		maxDesiredItemHeight = utilities.GetMaxInt(desiredItemHeight, maxDesiredItemHeight)
+	}
+
+	nonContentHeightNeeded := b.calculateAdditionalNonContentHeight()
+	return maxDesiredItemHeight + nonContentHeightNeeded
+}
+
+func (b *Flexbox) View(width int, height int) string {
+	// Width
+	nonContentWidthNeeded := b.calculateAdditionalNonContentWidth()
+	widthAvailableForChildren := utilities.GetMaxInt(0, width-nonContentWidthNeeded)
+	widthNotUsedByChildren := widthAvailableForChildren - b.childWidthsCalculationCache.totalWidthUsed
+
+	// Height
 	additionalNonContentHeight := b.calculateAdditionalNonContentHeight()
-	availableChildHeight := utilities.GetMaxInt(0, height-additionalNonContentHeight)
+	heightAvailableForChildren := utilities.GetMaxInt(0, height-additionalNonContentHeight)
+	childHeights, maxHeightUsedByChildren := b.calculateChildHeights(
+		b.childWidthsCalculationCache.childWidths,
+		heightAvailableForChildren,
+	)
+	heightNotUsedByChildren := heightAvailableForChildren - maxHeightUsedByChildren
 
 	// Now render each child, ensuring we expand the child's string if the resulting string is less
 	allContentFragments := make([]string, len(b.children))
 	for idx, item := range b.children {
-		childWidth := childWidths[idx]
-		childStr := item.View(childWidth, availableChildHeight)
+		childWidth := b.childWidthsCalculationCache.childWidths[idx]
+		childHeight := childHeights[idx]
+		childStr := item.View(childWidth, childHeight)
+
 		allContentFragments[idx] = childStr
 	}
 
+	// Justify horizontally
 	switch b.horizontalJustify {
 	case Left:
-		pad := strings.Repeat(" ", int(widthNotUsedByChildren))
+		pad := strings.Repeat(" ", widthNotUsedByChildren)
 		allContentFragments = append(allContentFragments, pad)
 	case Right:
-		pad := strings.Repeat(" ", int(widthNotUsedByChildren))
+		pad := strings.Repeat(" ", widthNotUsedByChildren)
 		allContentFragments = append([]string{pad}, allContentFragments...)
 	case Center:
 		leftPadSize := widthNotUsedByChildren / 2
 		rightPadSize := widthNotUsedByChildren - leftPadSize
-		leftPad := strings.Repeat(" ", int(leftPadSize))
-		rightPad := strings.Repeat(" ", int(rightPadSize))
+		leftPad := strings.Repeat(" ", leftPadSize)
+		rightPad := strings.Repeat(" ", rightPadSize)
 
 		newContentFragments := append([]string{leftPad}, allContentFragments...)
 		newContentFragments = append(newContentFragments, rightPad)
 		allContentFragments = newContentFragments
 	}
 
+	// TODO allow other align types
 	content := lipgloss.JoinHorizontal(lipgloss.Top, allContentFragments...)
 
-	switch b.horizontalJustify {
-
+	// Justify vertically
+	switch b.verticalJustify {
+	case Top:
+		content += strings.Repeat("\n", heightNotUsedByChildren)
+	case Bottom:
+		content = strings.Repeat("\n", heightNotUsedByChildren) + content
+	case Middle:
+		topPadSize := heightNotUsedByChildren / 2
+		bottomPadSize := heightNotUsedByChildren - topPadSize
+		topPad := strings.Repeat("\n", topPadSize)
+		bottomPad := strings.Repeat("\n", bottomPadSize)
+		content = topPad + content + bottomPad
 	}
 
 	result := lipgloss.NewStyle().
-		Padding(int(b.padding)).
+		Padding(b.padding).
 		Border(b.border).
 		Render(content)
 
@@ -258,13 +318,13 @@ func addSpaceByWeight(spaceToAllocate int, inputSizes []int, weights []int) []in
 	return result
 }
 
-func (b Flexbox) calculateChildWidths(widthAvailableForChildren int) ([]int, int) {
+func (b Flexbox) calculateChildWidths(widthAvailableForChildren int) calculateChildWidthsResult {
 
 	numChildren := len(b.children)
 
 	// First, add up the total width the items would like in a perfect world
 	totalMinWidthDesired := int(0) // Under this value, the flexbox will simply truncate
-	totalMaxWidthDesired := int(0) // Above this value, only the MaxAvailableWidth items will expand
+	totalMaxWidthDesired := int(0) // Above this value, only the MaxAvailable items will expand
 	childWidths := make([]int, numChildren)
 	maxConstrainedChildWidths := make([]int, numChildren)
 	for idx, item := range b.children {
@@ -295,7 +355,7 @@ func (b Flexbox) calculateChildWidths(widthAvailableForChildren int) ([]int, int
 		childWidths = addSpaceByWeight(spaceToDistributeEvenly, childWidths, weights)
 	}
 
-	// When width > max_desired_size, continue to scale only the elements whose max size is MaxAvailableWidth
+	// When width > max_desired_size, continue to scale only the elements whose max size is MaxAvailable
 	if widthAvailableForChildren > totalMaxWidthDesired {
 		weights := make([]int, numChildren)
 		for idx, item := range b.children {
@@ -324,5 +384,29 @@ func (b Flexbox) calculateChildWidths(widthAvailableForChildren int) ([]int, int
 		totalWidthUsed += actualWidth
 	}
 
-	return childWidths, totalWidthUsed
+	return calculateChildWidthsResult{
+		childWidths:    childWidths,
+		totalWidthUsed: totalWidthUsed,
+	}
+}
+
+func (b Flexbox) calculateChildHeights(childWidths []int, heightAvailable int) ([]int, int) {
+	// TODO cache these results???
+	childHeights := make([]int, len(b.children))
+	maxHeightUsed := 0
+	for idx, item := range b.children {
+		width := childWidths[idx]
+		height := item.GetContentHeightForGivenWidth(width)
+
+		if item.GetMaxHeight().ShouldGrow() {
+			height = utilities.GetMaxInt(height, heightAvailable)
+		}
+
+		// Ensure we don't overrun
+		height = utilities.GetMinInt(heightAvailable, height)
+
+		childHeights[idx] = height
+		maxHeightUsed = utilities.GetMaxInt(height, maxHeightUsed)
+	}
+	return childHeights, maxHeightUsed
 }

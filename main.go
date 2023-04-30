@@ -24,7 +24,7 @@ func main() {
 		flexbox_item.NewItem(text1),
 		flexbox_item.NewItem(text2),
 		flexbox_item.NewItem(text3).SetMinWidth(flexbox_item.FixedSize(20)),
-	).SetHorizontalJustify(flexbox.Center)
+	).SetHorizontalJustify(flexbox.Center).SetVerticalJustify(flexbox.Middle).SetBorder(lipgloss.NormalBorder())
 
 	if _, err := bubblebath.RunBubbleBathProgram(
 		yourBox,

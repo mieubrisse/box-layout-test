@@ -58,7 +58,7 @@ type flexboxItemImpl struct {
 
 	// These determine how the item flexes
 	// This is analogous to both "flex-basis" and "flex-grow", where:
-	// - MaxAvailableWidth indicates "flex-grow: >1" (see weight below)
+	// - MaxAvailable indicates "flex-grow: >1" (see weight below)
 	// - Anything else indicates "flex-grow: 0", and sets the "flex-basis"
 	minWidth  FlexboxItemDimensionValue
 	maxWidth  FlexboxItemDimensionValue
@@ -71,16 +71,16 @@ type flexboxItemImpl struct {
 	innerDimensionCache components.DimensionsCache
 
 	// TODO weight (analogous to flex-grow)
-	// When the child size constraint is set to MaxAvailableWidth, then this will be used
+	// When the child size constraint is set to MaxAvailable, then this will be used
 }
 
 func NewItem(component components.Component) FlexboxItem {
 	return &flexboxItemImpl{
 		component:     component,
-		minWidth:      MinContentWidth,
-		maxWidth:      MaxContentWidth,
-		minHeight:     MinContentWidth,
-		maxHeight:     MaxContentWidth,
+		minWidth:      MinContent,
+		maxWidth:      MaxContent,
+		minHeight:     MinContent,
+		maxHeight:     MaxContent,
 		overflowStyle: Wrap,
 	}
 }
@@ -105,6 +105,10 @@ func (item *flexboxItemImpl) GetContentMinMax() (minWidth int, maxWidth int, min
 	return itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight
 }
 
+func (item *flexboxItemImpl) GetContentHeightForGivenWidth(width int) int {
+	return item.component.GetContentHeightForGivenWidth(width)
+}
+
 func (item *flexboxItemImpl) View(width int, height int) string {
 	component := item.GetComponent()
 
@@ -123,20 +127,14 @@ func (item *flexboxItemImpl) View(width int, height int) string {
 	// TODO allow column format
 	result := component.View(widthWhenRendering, height)
 
-	// Truncate, in case the inner item rusn over (which will almost definitely be the case when overflowStyle = Truncate)
+	// Truncate, in case the inner item runs over (which will almost definitely be the case when overflowStyle = Truncate)
+	// Also expand, in case the inner item is smaller than what we need
 	result = lipgloss.NewStyle().
-		Width(int(width)).
-		Height(int(height)).
-		MaxWidth(int(width)).
-		MaxHeight(int(height)).
+		Width(width).
+		Height(height).
+		MaxWidth(width).
+		MaxHeight(height).
 		Render(result)
-
-	/*
-		// Now expand, to ensure that the item takes up exactly the space we requested
-		result = lipgloss.NewStyle().
-			Render(result)
-
-	*/
 
 	return result
 }
