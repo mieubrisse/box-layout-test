@@ -33,11 +33,6 @@ const (
 type Flexbox struct {
 	children []flexbox_item.FlexboxItem
 
-	// TODO make configurable on left and right
-	padding int
-
-	border lipgloss.Border
-
 	horizontalJustify HorizontalJustify
 	verticalJustify   VerticalJustify
 
@@ -66,22 +61,9 @@ func NewWithContents(items ...flexbox_item.FlexboxItem) *Flexbox {
 
 func New() *Flexbox {
 	return &Flexbox{
-		padding:           0,
 		children:          make([]flexbox_item.FlexboxItem, 0),
-		border:            lipgloss.Border{},
 		horizontalJustify: Left,
 	}
-}
-
-// TODO make this configurable per side
-func (b *Flexbox) SetPadding(padding int) *Flexbox {
-	b.padding = padding
-	return b
-}
-
-func (b *Flexbox) SetBorder(border lipgloss.Border) *Flexbox {
-	b.border = border
-	return b
 }
 
 func (b *Flexbox) SetChildren(children []flexbox_item.FlexboxItem) *Flexbox {
@@ -121,13 +103,11 @@ func (b *Flexbox) GetContentMinMax() (minWidth int, maxWidth int, minHeight int,
 		MaxHeight: childrenMaxHeight,
 	}
 
-	additionalNonContentWidth := b.calculateAdditionalNonContentWidth()
-	minWidth = childrenMinWidth + additionalNonContentWidth
-	maxWidth = childrenMaxWidth + additionalNonContentWidth
+	minWidth = childrenMinWidth
+	maxWidth = childrenMaxWidth
 
-	additionalNonContentHeight := b.calculateAdditionalNonContentHeight()
-	minHeight = childrenMinHeight + additionalNonContentHeight
-	maxHeight = childrenMaxHeight + additionalNonContentHeight
+	minHeight = childrenMinHeight
+	maxHeight = childrenMaxHeight
 
 	return
 }
@@ -136,9 +116,7 @@ func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
 	// TODO cache this result!!!!
 
 	// Width
-	nonContentWidthNeeded := b.calculateAdditionalNonContentWidth()
-	widthAvailableForChildren := utilities.GetMaxInt(0, width-nonContentWidthNeeded)
-	calculationResult := b.calculateChildWidths(widthAvailableForChildren)
+	calculationResult := b.calculateChildWidths(width)
 
 	// Cache the result, so we don't have to do this again during View
 	b.childWidthsCalculationCache = calculationResult
@@ -151,24 +129,19 @@ func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
 		maxDesiredItemHeight = utilities.GetMaxInt(desiredItemHeight, maxDesiredItemHeight)
 	}
 
-	nonContentHeightNeeded := b.calculateAdditionalNonContentHeight()
-	return maxDesiredItemHeight + nonContentHeightNeeded
+	return maxDesiredItemHeight
 }
 
 func (b *Flexbox) View(width int, height int) string {
 	// Width
-	nonContentWidthNeeded := b.calculateAdditionalNonContentWidth()
-	widthAvailableForChildren := utilities.GetMaxInt(0, width-nonContentWidthNeeded)
-	widthNotUsedByChildren := widthAvailableForChildren - b.childWidthsCalculationCache.totalWidthUsed
+	widthNotUsedByChildren := width - b.childWidthsCalculationCache.totalWidthUsed
 
 	// Height
-	additionalNonContentHeight := b.calculateAdditionalNonContentHeight()
-	heightAvailableForChildren := utilities.GetMaxInt(0, height-additionalNonContentHeight)
 	childHeights, maxHeightUsedByChildren := b.calculateChildHeights(
 		b.childWidthsCalculationCache.childWidths,
-		heightAvailableForChildren,
+		height,
 	)
-	heightNotUsedByChildren := heightAvailableForChildren - maxHeightUsedByChildren
+	heightNotUsedByChildren := height - maxHeightUsedByChildren
 
 	// Now render each child, ensuring we expand the child's string if the resulting string is less
 	allContentFragments := make([]string, len(b.children))
@@ -219,12 +192,7 @@ func (b *Flexbox) View(width int, height int) string {
 		content = topPad + content + bottomPad
 	}
 
-	result := lipgloss.NewStyle().
-		Padding(b.padding).
-		Border(b.border).
-		Render(content)
-
-	return result
+	return content
 }
 
 // ====================================================================================================
@@ -232,38 +200,6 @@ func (b *Flexbox) View(width int, height int) string {
 //	Private Helper Functions
 //
 // ====================================================================================================
-func (b Flexbox) calculateAdditionalNonContentWidth() int {
-	nonContentWidthAdditions := []int{
-		// Padding
-		2 * b.padding,
-
-		// Border
-		int(b.border.GetLeftSize() + b.border.GetRightSize()),
-	}
-
-	totalNonContentWidthAdded := int(0)
-	for _, addition := range nonContentWidthAdditions {
-		totalNonContentWidthAdded += addition
-	}
-	return totalNonContentWidthAdded
-}
-
-func (b Flexbox) calculateAdditionalNonContentHeight() int {
-	nonContentHeightAdditions := []int{
-		// Padding
-		2 * b.padding,
-
-		// Border
-		int(b.border.GetTopSize() + b.border.GetBottomSize()),
-	}
-
-	totalNonContentHeightAdded := int(0)
-	for _, addition := range nonContentHeightAdditions {
-		totalNonContentHeightAdded += addition
-	}
-	return totalNonContentHeightAdded
-}
-
 // Distributes the space
 // The only scenario where no space will be distributed is if there is no total weight
 // If the space does get distributed, it's guaranteed to be done exactly (no more or less will remain)
