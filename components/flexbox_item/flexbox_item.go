@@ -201,15 +201,15 @@ func calculateFlexboxItemContentSizesFromInnerContentSizes(
 	innerMaxHeight int,
 	item FlexboxItem,
 ) (itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight int) {
-	itemMinWidth = item.GetMinWidth().sizeRetriever(innerMinWidth, innertMaxWidth)
-	itemMaxWidth = item.GetMaxWidth().sizeRetriever(innerMinWidth, innertMaxWidth)
+	itemMinWidth = item.GetMinWidth().getSizeRetriever()(innerMinWidth, innertMaxWidth)
+	itemMaxWidth = item.GetMaxWidth().getSizeRetriever()(innerMinWidth, innertMaxWidth)
 
 	if itemMaxWidth < itemMinWidth {
 		itemMaxWidth = itemMinWidth
 	}
 
-	itemMinHeight = item.GetMinHeight().sizeRetriever(innerMinHeight, innerMaxHeight)
-	itemMaxHeight = item.GetMaxHeight().sizeRetriever(innerMinHeight, innerMaxHeight)
+	itemMinHeight = item.GetMinHeight().getSizeRetriever()(innerMinHeight, innerMaxHeight)
+	itemMaxHeight = item.GetMaxHeight().getSizeRetriever()(innerMinHeight, innerMaxHeight)
 
 	if itemMaxHeight < itemMinHeight {
 		itemMaxHeight = itemMinHeight

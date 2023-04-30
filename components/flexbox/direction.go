@@ -1,6 +1,9 @@
 package flexbox
 
-import "github.com/mieubrisse/box-layout-test/components/flexbox_item"
+import (
+	"github.com/charmbracelet/lipgloss"
+	"github.com/mieubrisse/box-layout-test/components/flexbox_item"
+)
 
 // The direction that the flexbox ought to be layed out in
 type Direction interface {
@@ -17,31 +20,34 @@ type Direction interface {
 
 	getActualHeights(desiredHeights []int, items []flexbox_item.FlexboxItem, heightAvailable int) axisSizeCalculationResults
 
-	renderContentFragments(contentFragments []string) string
+	renderContentFragments(contentFragments []string, width int, height int, horizontalAlignment AxisAlignment, verticalAlignment AxisAlignment) string
 }
 
 // Row lays out the flexbox items in a row, left to right
 // The flex direction will be horizontal
 // Corresponds to "flex-direction: row" in CSS
-func Row() Direction {
-	return &directionImpl{
-		actualWidthCalculator:  calculateActualMainAxisSizes,
-		actualHeightCalculator: calculateActualCrossAxisSizes,
-	}
+var Row = &directionImpl{
+	actualWidthCalculator:  calculateActualMainAxisSizes,
+	actualHeightCalculator: calculateActualCrossAxisSizes,
+	contentFragmentRenderer: func(contentFragments []string, width int, height int, horizontalAlign AxisAlignment, verticalAlign AxisAlignment) string {
+		joined := lipgloss.JoinHorizontal(lipgloss.Position(verticalAlign), contentFragments...)
+		horizontallyPlaced := lipgloss.PlaceHorizontal(width, lipgloss.Position(horizontalAlign), joined)
+		return lipgloss.PlaceVertical(height, lipgloss.Position(verticalAlign), horizontallyPlaced)
+	},
 }
 
 // Column lays out the flexbox items in a column, top to bottom
 // The flex direction will be vertical
 // Corresponds to "flex-direction: column" in CSS
-func Column() Direction {
-	return &directionImpl{
-		actualWidthCalculator:  calculateActualCrossAxisSizes,
-		actualHeightCalculator: calculateActualMainAxisSizes,
-	}
-
+var Column = &directionImpl{
+	actualWidthCalculator:  calculateActualCrossAxisSizes,
+	actualHeightCalculator: calculateActualMainAxisSizes,
+	contentFragmentRenderer: func(contentFragments []string, width int, height int, horizontalAlign AxisAlignment, verticalAlign AxisAlignment) string {
+		joined := lipgloss.JoinVertical(lipgloss.Position(horizontalAlign), contentFragments...)
+		horizontallyPlaced := lipgloss.PlaceHorizontal(width, lipgloss.Position(horizontalAlign), joined)
+		return lipgloss.PlaceVertical(height, lipgloss.Position(verticalAlign), horizontallyPlaced)
+	},
 }
-
-// TODO column
 
 // ====================================================================================================
 //
@@ -49,8 +55,9 @@ func Column() Direction {
 //
 // ====================================================================================================
 type directionImpl struct {
-	actualWidthCalculator  axisSizeCalculator
-	actualHeightCalculator axisSizeCalculator
+	actualWidthCalculator   axisSizeCalculator
+	actualHeightCalculator  axisSizeCalculator
+	contentFragmentRenderer func(contentFragments []string, width int, height int, horizontalAlign AxisAlignment, verticalAlign AxisAlignment) string
 }
 
 func (r directionImpl) getActualWidths(desiredWidths []int, items []flexbox_item.FlexboxItem, widthAvailable int) axisSizeCalculationResults {
@@ -75,7 +82,6 @@ func (r directionImpl) getActualHeights(desiredHeights []int, items []flexbox_it
 	)
 }
 
-func (r directionImpl) renderContentFragments(contentFragments []string) string {
-	//TODO implement me
-	panic("implement me")
+func (r directionImpl) renderContentFragments(contentFragments []string, width int, height int, horizontalAlign AxisAlignment, verticalAlign AxisAlignment) string {
+	return r.contentFragmentRenderer(contentFragments, width, height, horizontalAlign, verticalAlign)
 }

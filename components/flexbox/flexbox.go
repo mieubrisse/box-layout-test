@@ -1,29 +1,28 @@
 package flexbox
 
 import (
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mieubrisse/box-layout-test/components"
 	"github.com/mieubrisse/box-layout-test/components/flexbox_item"
 	"github.com/mieubrisse/box-layout-test/utilities"
-	"strings"
 )
 
+/*
 // When the children don't completely fill the box, where to put teh
 // Corresponds to "justify-content" in CSS
-type MainAxisAlignment int
+type HorizontalAlignment int
 
 const (
 	// Elements will be at the start of the flexbox (as determined by the Direction)
 	// Corresponds to "flex-justify: flex-start"
-	MainAxisStart MainAxisAlignment = iota
+	LeftAlignment HorizontalAlignment = iota
 
 	// NOTE: in order to see this in effect, you must have
 	// Corresponds to "flex-justify: center"
-	MainAxisCenter
+	CenterAlignment
 
 	// Elements will be pushed to the end of the flexbox (as determined by the Direction)
 	// Corresponds to "flex-justify: flex-end"
-	MainAxisEnd
+	RightAlignment
 
 	// TODO space-between, space-around, space-evenly: https://css-tricks.com/snippets/css/a-guide-to-flexbox/
 )
@@ -33,20 +32,22 @@ const (
 type CrossAxisAlignment int
 
 const (
-	// CrossAxisStart arranges items at the start of the cross axis, when there is extra space
+	// TopAlignment arranges items at the start of the cross axis, when there is extra space
 	// E.g. when the flexbox direction is horizontal, this will push items to the top
 	// Coreresponds to "align-items: flex-start" in CSS
-	CrossAxisStart CrossAxisAlignment = iota
+	TopAlignment CrossAxisAlignment = iota
 
-	// CrossAxisMiddle arranges items in the center of the cross axis, when there is extra space
+	// MiddleAlignment arranges items in the center of the cross axis, when there is extra space
 	// E.g. when the flexbox direction is horizontal, this will push items to the top
 	// Coreresponds to "align-items: center" in CSS
-	CrossAxisMiddle
+	MiddleAlignment
 
-	// CrossAxisEnd arranges items at the end of the cross axis, when there is extra space
+	// BottomAlignment arranges items at the end of the cross axis, when there is extra space
 	// Coreresponds to "align-items: flex-end" in CSS
-	CrossAxisEnd
+	BottomAlignment
 )
+
+*/
 
 // TODO make an interface
 type Flexbox struct {
@@ -54,8 +55,8 @@ type Flexbox struct {
 
 	direction Direction
 
-	mainAxisAlignment  MainAxisAlignment
-	crossAxisAlignment CrossAxisAlignment
+	horizontalAlignment AxisAlignment
+	verticalAlignment   AxisAlignment
 
 	// -------------------- Calculation Caching -----------------------
 	// The widths each child desires (cached between GetContentMinMax and GetContentHeightForGivenWidth
@@ -84,8 +85,13 @@ func NewWithContents(items ...flexbox_item.FlexboxItem) *Flexbox {
 
 func New() *Flexbox {
 	return &Flexbox{
-		children:          make([]flexbox_item.FlexboxItem, 0),
-		mainAxisAlignment: MainAxisStart,
+		children:                           make([]flexbox_item.FlexboxItem, 0),
+		direction:                          Row,
+		horizontalAlignment:                AlignStart,
+		verticalAlignment:                  AlignStart,
+		desiredChildWidthsCache:            nil,
+		actualChildWidthsCache:             axisSizeCalculationResults{},
+		desiredChildHeightsGivenWidthCache: nil,
 	}
 }
 
@@ -94,13 +100,18 @@ func (b *Flexbox) SetChildren(children []flexbox_item.FlexboxItem) *Flexbox {
 	return b
 }
 
-func (b *Flexbox) SetMainAxesAlignment(alignment MainAxisAlignment) *Flexbox {
-	b.mainAxisAlignment = alignment
+func (b *Flexbox) SetDirection(direction Direction) *Flexbox {
+	b.direction = direction
 	return b
 }
 
-func (b *Flexbox) SetCrossAxisAlignment(alignment CrossAxisAlignment) *Flexbox {
-	b.crossAxisAlignment = alignment
+func (b *Flexbox) SetHorizontalAlignment(alignment AxisAlignment) *Flexbox {
+	b.horizontalAlignment = alignment
+	return b
+}
+
+func (b *Flexbox) SetVerticalAlignment(alignment AxisAlignment) *Flexbox {
+	b.verticalAlignment = alignment
 	return b
 }
 
@@ -158,12 +169,12 @@ func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
 
 func (b *Flexbox) View(width int, height int) string {
 	actualWidths := b.actualChildWidthsCache.actualSizes
-	widthNotUsedByChildren := utilities.GetMaxInt(0, width-b.actualChildWidthsCache.spaceUsedByChildren)
+	// widthNotUsedByChildren := utilities.GetMaxInt(0, width-b.actualChildWidthsCache.spaceUsedByChildren)
 
 	actualHeightsCalcResult := b.direction.getActualHeights(b.desiredChildHeightsGivenWidthCache, b.children, height)
 
 	actualHeights := actualHeightsCalcResult.actualSizes
-	heightNotUsedByChildren := utilities.GetMaxInt(0, height-actualHeightsCalcResult.spaceUsedByChildren)
+	// heightNotUsedByChildren := utilities.GetMaxInt(0, height-actualHeightsCalcResult.spaceUsedByChildren)
 
 	// Now render each child
 	allContentFragments := make([]string, len(b.children))
@@ -175,42 +186,47 @@ func (b *Flexbox) View(width int, height int) string {
 		allContentFragments[idx] = childStr
 	}
 
-	// Justify main axis
-	switch b.mainAxisAlignment {
-	case MainAxisStart:
-		pad := strings.Repeat(" ", widthNotUsedByChildren)
-		allContentFragments = append(allContentFragments, pad)
-	case MainAxisEnd:
-		pad := strings.Repeat(" ", widthNotUsedByChildren)
-		allContentFragments = append([]string{pad}, allContentFragments...)
-	case MainAxisCenter:
-		leftPadSize := widthNotUsedByChildren / 2
-		rightPadSize := widthNotUsedByChildren - leftPadSize
-		leftPad := strings.Repeat(" ", leftPadSize)
-		rightPad := strings.Repeat(" ", rightPadSize)
+	content := b.direction.renderContentFragments(allContentFragments, width, height, b.horizontalAlignment, b.verticalAlignment)
 
-		newContentFragments := append([]string{leftPad}, allContentFragments...)
-		newContentFragments = append(newContentFragments, rightPad)
-		allContentFragments = newContentFragments
-	}
+	/*
+		// Justify main axis
+		switch b.horizontalAlignment {
+		case AlignStart:
+			pad := strings.Repeat(" ", widthNotUsedByChildren)
+			content += pad
+		case AlignEnd:
+			pad := strings.Repeat(" ", widthNotUsedByChildren)
+			content = pad + content
+		case AlignCenter:
+			leftPadSize := widthNotUsedByChildren / 2
+			rightPadSize := widthNotUsedByChildren - leftPadSize
+			leftPad := strings.Repeat(" ", leftPadSize)
+			rightPad := strings.Repeat(" ", rightPadSize)
 
-	// Justify cross axis
-	var content string
-	switch b.crossAxisAlignment {
-	case CrossAxisStart:
-		content = lipgloss.JoinHorizontal(lipgloss.Top, allContentFragments...)
-		content += strings.Repeat("\n", heightNotUsedByChildren)
-	case CrossAxisEnd:
-		content = lipgloss.JoinHorizontal(lipgloss.Bottom, allContentFragments...)
-		content = strings.Repeat("\n", heightNotUsedByChildren) + content
-	case CrossAxisMiddle:
-		content = lipgloss.JoinHorizontal(lipgloss.Center, allContentFragments...)
-		topPadSize := heightNotUsedByChildren / 2
-		bottomPadSize := heightNotUsedByChildren - topPadSize
-		topPad := strings.Repeat("\n", topPadSize)
-		bottomPad := strings.Repeat("\n", bottomPadSize)
-		content = topPad + content + bottomPad
-	}
+			newContentFragments := append([]string{leftPad}, allContentFragments...)
+			newContentFragments = append(newContentFragments, rightPad)
+			allContentFragments = newContentFragments
+		}
+
+		// Justify cross axis
+		var content string
+		switch b.verticalAlignment {
+		case AlignStart:
+			content = lipgloss.JoinHorizontal(lipgloss.Top, allContentFragments...)
+			content += strings.Repeat("\n", heightNotUsedByChildren)
+		case AlignEnd:
+			content = lipgloss.JoinHorizontal(lipgloss.Bottom, allContentFragments...)
+			content = strings.Repeat("\n", heightNotUsedByChildren) + content
+		case AlignCenter:
+			content = lipgloss.JoinHorizontal(lipgloss.Center, allContentFragments...)
+			topPadSize := heightNotUsedByChildren / 2
+			bottomPadSize := heightNotUsedByChildren - topPadSize
+			topPad := strings.Repeat("\n", topPadSize)
+			bottomPad := strings.Repeat("\n", bottomPadSize)
+			content = topPad + content + bottomPad
+		}
+
+	*/
 
 	return content
 }
