@@ -19,9 +19,6 @@ type Flexbox struct {
 	verticalAlignment   AxisAlignment
 
 	// -------------------- Calculation Caching -----------------------
-	// The widths each child desires (cached between GetContentMinMax and GetContentHeightForGivenWidth
-	desiredChildWidthsCache []int
-
 	// The actual widths each child will get (cached between GetContentHeightForGivenWidth and View)
 	actualChildWidthsCache axisSizeCalculationResults
 
@@ -49,7 +46,6 @@ func New() *Flexbox {
 		direction:                          Row,
 		horizontalAlignment:                AlignStart,
 		verticalAlignment:                  AlignStart,
-		desiredChildWidthsCache:            nil,
 		actualChildWidthsCache:             axisSizeCalculationResults{},
 		desiredChildHeightsGivenWidthCache: nil,
 	}
@@ -76,30 +72,7 @@ func (b *Flexbox) SetVerticalAlignment(alignment AxisAlignment) *Flexbox {
 }
 
 func (b *Flexbox) GetContentMinMax() (minWidth int, maxWidth int, minHeight int, maxHeight int) {
-	// TODO allow column layout
-
-	var childrenMinWidth, childrenMaxWidth, childrenMinHeight, childrenMaxHeight int
-	b.desiredChildWidthsCache = make([]int, len(b.children))
-	for idx, item := range b.children {
-		itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight := item.GetContentMinMax()
-
-		// Cache the item's max width; we'll need it in GetContentHeightForGivenWidth
-		b.desiredChildWidthsCache[idx] = itemMaxWidth
-
-		// Calculate the maxes
-		childrenMinWidth = utilities.GetMaxInt(childrenMinWidth, itemMinWidth)
-		childrenMaxWidth = utilities.GetMaxInt(childrenMaxWidth, itemMaxWidth)
-		childrenMinHeight = utilities.GetMaxInt(childrenMinHeight, itemMinHeight)
-		childrenMaxHeight = utilities.GetMaxInt(childrenMaxHeight, itemMaxHeight)
-	}
-
-	minWidth = childrenMinWidth
-	maxWidth = childrenMaxWidth
-
-	minHeight = childrenMinHeight
-	maxHeight = childrenMaxHeight
-
-	return
+	return b.direction.getContentSizes(b.children)
 }
 
 func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
@@ -108,11 +81,13 @@ func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
 	}
 
 	// Width
+	desiredChildWidths := make([]int, len(b.children)) // NOTE: we actually already calculated this above, with GetContentMinMax. Maybe cache?
 	shouldGrowWidths := make([]bool, len(b.children))
 	for idx, item := range b.children {
+		_, desiredChildWidths[idx], _, _ = item.GetComponent().GetContentMinMax()
 		shouldGrowWidths[idx] = item.GetMaxWidth().ShouldGrow()
 	}
-	actualWidthsCalcResults := b.direction.getActualWidths(b.desiredChildWidthsCache, shouldGrowWidths, width)
+	actualWidthsCalcResults := b.direction.getActualWidths(desiredChildWidths, shouldGrowWidths, width)
 
 	// Cache the result, so we don't have to recalculate it in View
 	b.actualChildWidthsCache = actualWidthsCalcResults

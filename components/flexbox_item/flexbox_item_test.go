@@ -1,6 +1,8 @@
 package flexbox_item
 
 import (
+	"github.com/charmbracelet/lipgloss"
+	"github.com/mieubrisse/box-layout-test/components/stylebox"
 	"github.com/mieubrisse/box-layout-test/components/test_assertions"
 	"github.com/mieubrisse/box-layout-test/components/text"
 	"testing"
@@ -46,4 +48,17 @@ func TestWrap(t *testing.T) {
 	)
 
 	test_assertions.CheckAll(t, assertions, component)
+}
+
+func TestStyleboxInside(t *testing.T) {
+	contained := stylebox.New(text.New("This is child 2")).
+		SetStyle(lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()))
+	component := New(contained)
+
+	assertions := test_assertions.FlattenAssertionGroups(
+		test_assertions.GetContentSizeAssertions(7, 17, 3, 6),
+	)
+
+	test_assertions.CheckAll(t, assertions, component)
+
 }

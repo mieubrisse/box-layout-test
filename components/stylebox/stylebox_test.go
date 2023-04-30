@@ -55,7 +55,6 @@ func TestPadding(t *testing.T) {
 }
 
 func TestBorder(t *testing.T) {
-	// Even padding
 	style := lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder())
 	component := New(inner).SetStyle(style)
 
