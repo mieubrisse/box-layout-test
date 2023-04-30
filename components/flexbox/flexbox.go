@@ -72,8 +72,8 @@ const (
 type Flexbox struct {
 	children []flexbox_item.FlexboxItem
 
-	mainAxisAlignment MainAxisAlignment
-	verticalJustify   CrossAxisAlignment
+	mainAxisAlignment  MainAxisAlignment
+	crossAxisAlignment CrossAxisAlignment
 
 	// -------------------- Calculation Caching -----------------------
 	// Cache of the min/max widths/heights across all children
@@ -115,8 +115,8 @@ func (b *Flexbox) SetMainAxesAlignment(alignment MainAxisAlignment) *Flexbox {
 	return b
 }
 
-func (b *Flexbox) SetVerticalJustify(justify CrossAxisAlignment) *Flexbox {
-	b.verticalJustify = justify
+func (b *Flexbox) SetCrossAxisAlignment(alignment CrossAxisAlignment) *Flexbox {
+	b.crossAxisAlignment = alignment
 	return b
 }
 
@@ -177,7 +177,7 @@ func (b *Flexbox) View(width int, height int) string {
 	widthNotUsedByChildren := width - b.childWidthsCalculationCache.totalWidthUsed
 
 	// Height
-	childHeights, maxHeightUsedByChildren := b.calculateChildHeights(
+	childHeights, maxHeightUsedByChildren := b.calculateCrossAxisHeights(
 		b.childWidthsCalculationCache.childWidths,
 		height,
 	)
@@ -193,7 +193,7 @@ func (b *Flexbox) View(width int, height int) string {
 		allContentFragments[idx] = childStr
 	}
 
-	// Justify horizontally
+	// Justify main axis
 	switch b.mainAxisAlignment {
 	case MainAxisStart:
 		pad := strings.Repeat(" ", widthNotUsedByChildren)
@@ -214,9 +214,9 @@ func (b *Flexbox) View(width int, height int) string {
 
 	// TODO allow other align types
 
-	// Justify vertically
+	// Justify cross axis
 	var content string
-	switch b.verticalJustify {
+	switch b.crossAxisAlignment {
 	case CrossAxisStart:
 		content = lipgloss.JoinHorizontal(lipgloss.Top, allContentFragments...)
 		content += strings.Repeat("\n", heightNotUsedByChildren)
@@ -240,225 +240,3 @@ func (b *Flexbox) View(width int, height int) string {
 //	Private Helper Functions
 //
 // ====================================================================================================
-// Distributes the space
-// The only scenario where no space will be distributed is if there is no total weight
-// If the space does get distributed, it's guaranteed to be done exactly (no more or less will remain)
-func addSpaceByWeight(spaceToAllocate int, inputSizes []int, weights []int) []int {
-	result := make([]int, len(inputSizes))
-	for idx, inputSize := range inputSizes {
-		result[idx] = inputSize
-	}
-
-	totalWeight := int(0)
-	for _, weight := range weights {
-		totalWeight += weight
-	}
-
-	// watch out for divide-by-zero
-	if totalWeight == 0 {
-		return result
-	}
-
-	desiredSpaceAllocated := float64(0)
-	actualSpaceAllocated := int(0)
-	for idx, size := range inputSizes {
-		result[idx] = size
-
-		// Dump any remaining space for the last item (it should always be at most 1
-		// in any direction)
-		if idx == len(inputSizes)-1 {
-			result[idx] += spaceToAllocate - actualSpaceAllocated
-			break
-		}
-
-		weight := weights[idx]
-		share := float64(weight) / float64(totalWeight)
-
-		// Because we can only display lines in integer numbers, but flexing
-		// will yield float scale ratios, no matter what space we give each item
-		// our integer value will always be off from the float value
-		// This algorithm is to ensure that we're always rounding in the direction
-		// that pushes us closer to our desired allocation (rather than naively rounding up or down)
-		desiredSpaceForItem := share * float64(spaceToAllocate)
-		var actualSpaceForItem int
-		if desiredSpaceAllocated < float64(actualSpaceAllocated) {
-			// Round up
-			actualSpaceForItem = int(desiredSpaceForItem + 1)
-		} else {
-			// Round down
-			actualSpaceForItem = int(desiredSpaceForItem)
-		}
-
-		result[idx] += actualSpaceForItem
-		desiredSpaceAllocated += desiredSpaceForItem
-		actualSpaceAllocated += actualSpaceForItem
-	}
-
-	return result
-}
-
-// Calculates
-func (b Flexbox) calculateMainAxisItemSizes(mins []int, maxes []int) ([]int, int) {
-	// First, add up the space each item would like in a perfect world
-	totalMinSpaceDesired := 0 // Under this value, the flexbox will simply truncate
-	totalMaxSpaceDesired := 0 // Above this value, only the items that have MaxAvailable set for this dimension will expand
-
-	// First, add up the total width the items would like in a perfect world
-	childWidths := make([]int, numChildren)
-	maxConstrainedChildWidths := make([]int, numChildren)
-	for idx, item := range b.children {
-		itemMinWidth, itemMaxWidth, _, _ := item.GetContentMinMax()
-
-		totalMinWidthDesired += itemMinWidth
-		totalMaxWidthDesired += itemMaxWidth
-
-		childWidths[idx] = itemMinWidth
-		maxConstrainedChildWidths[idx] = itemMaxWidth
-	}
-
-	// When min_desired_size < space_available < max_desired_size, scale everyone up equally between their
-	// min and max sizes
-	if widthAvailableForChildren > totalMinWidthDesired {
-		weights := make([]int, numChildren)
-		for idx, minChildSize := range childWidths {
-			maxChildSize := maxConstrainedChildWidths[idx]
-			childExpansionRange := maxChildSize - minChildSize
-			weights[idx] = childExpansionRange
-		}
-
-		spaceToDistributeEvenly := utilities.GetMinInt(
-			widthAvailableForChildren-totalMinWidthDesired,
-			totalMaxWidthDesired-totalMinWidthDesired,
-		)
-
-		childWidths = addSpaceByWeight(spaceToDistributeEvenly, childWidths, weights)
-	}
-
-	// When width > max_desired_size, continue to scale only the elements whose max size is MaxAvailable
-	if widthAvailableForChildren > totalMaxWidthDesired {
-		weights := make([]int, numChildren)
-		for idx, item := range b.children {
-			if item.GetMaxWidth().ShouldGrow() {
-				// TODO use actual weights
-				weights[idx] = 1
-				continue
-			}
-
-			weights[idx] = 0
-		}
-
-		spaceToDistributeToExpanders := widthAvailableForChildren - totalMaxWidthDesired
-
-		childWidths = addSpaceByWeight(spaceToDistributeToExpanders, childWidths, weights)
-	}
-
-	// Finally, ensure that the child widths don't exceed our available space
-	totalWidthUsed := int(0)
-	widthAvailable := widthAvailableForChildren
-	for idx, childWidth := range childWidths {
-		actualWidth := utilities.GetMinInt(widthAvailable, childWidth)
-		childWidths[idx] = actualWidth
-
-		widthAvailable -= actualWidth
-		totalWidthUsed += actualWidth
-	}
-
-	return calculateChildWidthsResult{
-		childWidths:    childWidths,
-		totalWidthUsed: totalWidthUsed,
-	}
-}
-
-// Calculates the sizes for children
-func (b Flexbox) calculateMainAxisWidths(widthAvailableForChildren int) calculateChildWidthsResult {
-
-	numChildren := len(b.children)
-
-	// First, add up the total width the items would like in a perfect world
-	totalMinWidthDesired := int(0) // Under this value, the flexbox will simply truncate
-	totalMaxWidthDesired := int(0) // Above this value, only the MaxAvailable items will expand
-	childWidths := make([]int, numChildren)
-	maxConstrainedChildWidths := make([]int, numChildren)
-	for idx, item := range b.children {
-		itemMinWidth, itemMaxWidth, _, _ := item.GetContentMinMax()
-
-		totalMinWidthDesired += itemMinWidth
-		totalMaxWidthDesired += itemMaxWidth
-
-		childWidths[idx] = itemMinWidth
-		maxConstrainedChildWidths[idx] = itemMaxWidth
-	}
-
-	// When min_desired_size < space_available < max_desired_size, scale everyone up equally between their
-	// min and max sizes
-	if widthAvailableForChildren > totalMinWidthDesired {
-		weights := make([]int, numChildren)
-		for idx, minChildSize := range childWidths {
-			maxChildSize := maxConstrainedChildWidths[idx]
-			childExpansionRange := maxChildSize - minChildSize
-			weights[idx] = childExpansionRange
-		}
-
-		spaceToDistributeEvenly := utilities.GetMinInt(
-			widthAvailableForChildren-totalMinWidthDesired,
-			totalMaxWidthDesired-totalMinWidthDesired,
-		)
-
-		childWidths = addSpaceByWeight(spaceToDistributeEvenly, childWidths, weights)
-	}
-
-	// When width > max_desired_size, continue to scale only the elements whose max size is MaxAvailable
-	if widthAvailableForChildren > totalMaxWidthDesired {
-		weights := make([]int, numChildren)
-		for idx, item := range b.children {
-			if item.GetMaxWidth().ShouldGrow() {
-				// TODO use actual weights
-				weights[idx] = 1
-				continue
-			}
-
-			weights[idx] = 0
-		}
-
-		spaceToDistributeToExpanders := widthAvailableForChildren - totalMaxWidthDesired
-
-		childWidths = addSpaceByWeight(spaceToDistributeToExpanders, childWidths, weights)
-	}
-
-	// Finally, ensure that the child widths don't exceed our available space
-	totalWidthUsed := int(0)
-	widthAvailable := widthAvailableForChildren
-	for idx, childWidth := range childWidths {
-		actualWidth := utilities.GetMinInt(widthAvailable, childWidth)
-		childWidths[idx] = actualWidth
-
-		widthAvailable -= actualWidth
-		totalWidthUsed += actualWidth
-	}
-
-	return calculateChildWidthsResult{
-		childWidths:    childWidths,
-		totalWidthUsed: totalWidthUsed,
-	}
-}
-
-func (b Flexbox) calculateChildHeights(childWidths []int, heightAvailable int) ([]int, int) {
-	// TODO cache these results???
-	childHeights := make([]int, len(b.children))
-	maxHeightUsed := 0
-	for idx, item := range b.children {
-		width := childWidths[idx]
-		height := item.GetContentHeightForGivenWidth(width)
-
-		if item.GetMaxHeight().ShouldGrow() {
-			height = utilities.GetMaxInt(height, heightAvailable)
-		}
-
-		// Ensure we don't overrun
-		height = utilities.GetMinInt(heightAvailable, height)
-
-		childHeights[idx] = height
-		maxHeightUsed = utilities.GetMaxInt(height, maxHeightUsed)
-	}
-	return childHeights, maxHeightUsed
-}

@@ -34,7 +34,7 @@ func main() {
 		flexbox_item.NewItem(text1),
 		flexbox_item.NewItem(text2),
 		flexbox_item.NewItem(text3),
-	).SetMainAxesAlignment(flexbox.MainAxisCenter).SetVerticalJustify(flexbox.CrossAxisMiddle)
+	).SetMainAxesAlignment(flexbox.MainAxisCenter).SetCrossAxisAlignment(flexbox.CrossAxisMiddle)
 
 	appBox := stylebox.New(yourBox).SetStyle(lipgloss.NewStyle().Border(lipgloss.NormalBorder()))
 
