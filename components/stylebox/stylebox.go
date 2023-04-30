@@ -74,14 +74,23 @@ func (s styleboxImpl) View(width int, height int) string {
 	innerHeight := utilities.GetMaxInt(0, height-s.style.GetVerticalFrameSize())
 	innerStr := s.component.View(innerWidth, innerHeight)
 
-	result := lipgloss.NewStyle().
-		Width(innerWidth).
-		Height(innerHeight).
+	// First truncate to ensure none of the children have overflowed
+	truncatedInnerStr := lipgloss.NewStyle().
 		MaxWidth(innerWidth).
 		MaxHeight(innerHeight).
 		Render(innerStr)
 
-	result = s.style.Render(result)
+	// Then expand the child to the right height & width (in case the child is erroneously a smaller block)
+	expandedInnerStr := lipgloss.NewStyle().Width(innerWidth).Height(innerHeight).Render(truncatedInnerStr)
+
+	// Apply our styles...
+	styled := s.style.Render(expandedInnerStr)
+
+	// ...and then truncate down again in case our styles caused an exceeding of the box
+	result := lipgloss.NewStyle().
+		MaxWidth(width).
+		MaxHeight(height).
+		Render(styled)
 
 	return result
 }

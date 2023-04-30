@@ -11,7 +11,7 @@ var inner = text.New("\nThis is a\nmultiline string\n\n")
 var innerMinWidth, innerMaxWidth, innerMinHeight, innerMaxHeight = inner.GetContentMinMax()
 var noChangeAssertion = test_assertions.RenderedContentAssertion{
 	Width:           innerMaxWidth,
-	Height:          innerMaxHeight,
+	Height:          innerMinHeight,
 	ExpectedContent: inner.View(innerMaxWidth, innerMaxHeight),
 }
 
@@ -44,6 +44,7 @@ func TestPadding(t *testing.T) {
 		),
 		// Should be only padding when there's no place for content
 		test_assertions.GetRenderedContentAssertion(3, 3, "   \n   \n   "),
+		test_assertions.GetRenderedContentAssertion(5, 6, "     \n     \n     \n  T  \n     \n     "),
 	)
 
 	test_assertions.CheckAll(

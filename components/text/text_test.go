@@ -71,3 +71,16 @@ func TestInvisibleString(t *testing.T) {
 
 	test_assertions.CheckAll(t, sizeAssertions, New(str))
 }
+
+func TestSmallWidths(t *testing.T) {
+	text := "\nThis is a\nmultiline string\n\n"
+	component := New(text)
+
+	assertions := test_assertions.FlattenAssertionGroups(
+		test_assertions.GetRenderedContentAssertion(2, 2, "  \nTh"),
+		test_assertions.GetRenderedContentAssertion(2, 5, "  \nTh\nis\nis\na "),
+		test_assertions.GetRenderedContentAssertion(5, 5, "     \nThis \nis a \nmulti\nline "),
+	)
+
+	test_assertions.CheckAll(t, assertions, component)
+}

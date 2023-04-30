@@ -35,7 +35,7 @@ func GetDefaultAssertions() []ComponentAssertion {
 		// Every component should be zero height when zero width
 		GetHeightAtWidthAssertions(0, 0),
 
-		// A zero height or width should result in an empty string
+		// A zero height or width should always in an empty string
 		GetRenderedContentAssertion(1, 0, ""),
 		GetRenderedContentAssertion(0, 1, ""),
 		GetRenderedContentAssertion(0, 0, ""),
