@@ -2,7 +2,6 @@ package flexbox
 
 import (
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mieubrisse/box-layout-test/components/flexbox_item"
 )
 
 // The direction that the flexbox ought to be layed out in
@@ -16,9 +15,9 @@ type Direction interface {
 
 	*/
 
-	getActualWidths(desiredWidths []int, items []flexbox_item.FlexboxItem, widthAvailable int) axisSizeCalculationResults
+	getActualWidths(desiredWidths []int, shouldGrow []bool, widthAvailable int) axisSizeCalculationResults
 
-	getActualHeights(desiredHeights []int, items []flexbox_item.FlexboxItem, heightAvailable int) axisSizeCalculationResults
+	getActualHeights(desiredHeights []int, shouldGrow []bool, heightAvailable int) axisSizeCalculationResults
 
 	renderContentFragments(contentFragments []string, width int, height int, horizontalAlignment AxisAlignment, verticalAlignment AxisAlignment) string
 }
@@ -60,25 +59,19 @@ type directionImpl struct {
 	contentFragmentRenderer func(contentFragments []string, width int, height int, horizontalAlign AxisAlignment, verticalAlign AxisAlignment) string
 }
 
-func (r directionImpl) getActualWidths(desiredWidths []int, items []flexbox_item.FlexboxItem, widthAvailable int) axisSizeCalculationResults {
+func (r directionImpl) getActualWidths(desiredWidths []int, shouldGrow []bool, widthAvailable int) axisSizeCalculationResults {
 	return r.actualWidthCalculator(
-		items,
 		desiredWidths,
+		shouldGrow,
 		widthAvailable,
-		func(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue {
-			return item.GetMaxWidth()
-		},
 	)
 }
 
-func (r directionImpl) getActualHeights(desiredHeights []int, items []flexbox_item.FlexboxItem, heightAvailable int) axisSizeCalculationResults {
+func (r directionImpl) getActualHeights(desiredHeights []int, shouldGrow []bool, heightAvailable int) axisSizeCalculationResults {
 	return r.actualHeightCalculator(
-		items,
 		desiredHeights,
+		shouldGrow,
 		heightAvailable,
-		func(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue {
-			return item.GetMaxHeight()
-		},
 	)
 }
 

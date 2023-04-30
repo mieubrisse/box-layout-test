@@ -1,17 +1,13 @@
 package flexbox
 
 import (
-	"github.com/mieubrisse/box-layout-test/components/flexbox_item"
 	"github.com/mieubrisse/box-layout-test/utilities"
 )
 
-type itemDimensionValueGetter func(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue
-
 type axisSizeCalculator func(
-	items []flexbox_item.FlexboxItem,
 	desiredSizes []int,
+	shouldGrow []bool,
 	spaceAvailable int,
-	maxDimensionValueGetter itemDimensionValueGetter,
 ) axisSizeCalculationResults
 
 type axisSizeCalculationResults struct {
@@ -22,20 +18,18 @@ type axisSizeCalculationResults struct {
 
 // TODO move to be a function on the axis?
 func calculateActualCrossAxisSizes(
-	items []flexbox_item.FlexboxItem,
 	desiredSizes []int,
+	shouldGrow []bool,
 	// How much space is available in the cross axis
 	spaceAvailable int,
-	// How to get the item's desired max value in the cross axis
-	crossAxisMaxValueGetter itemDimensionValueGetter,
 ) axisSizeCalculationResults {
-	actualSizes := make([]int, len(items))
+	actualSizes := make([]int, len(desiredSizes))
 
 	// The space used in the cross axis is the max across all children
 	maxSpaceUsed := 0
-	for idx, item := range items {
-		actualSize := desiredSizes[idx]
-		if crossAxisMaxValueGetter(item).ShouldGrow() {
+	for idx, desiredSize := range desiredSizes {
+		actualSize := desiredSize
+		if shouldGrow[idx] {
 			actualSize = utilities.GetMaxInt(actualSize, spaceAvailable)
 		}
 
@@ -52,10 +46,9 @@ func calculateActualCrossAxisSizes(
 }
 
 func calculateActualMainAxisSizes(
-	items []flexbox_item.FlexboxItem,
 	desiredSizes []int,
+	shouldGrow []bool,
 	spaceAvailable int,
-	mainAxisValueGetter itemDimensionValueGetter,
 ) axisSizeCalculationResults {
 	totalDesiredSize := 0
 	for _, desiredSize := range desiredSizes {
@@ -66,11 +59,11 @@ func calculateActualMainAxisSizes(
 	freeSpace := spaceAvailable - totalDesiredSize
 	// The "grow" case
 	if freeSpace > 0 {
-		weights := make([]int, len(items))
-		for idx, item := range items {
-			if mainAxisValueGetter(item).ShouldGrow() {
+		weights := make([]int, len(desiredSizes))
+		for idx, desiredSize := range desiredSizes {
+			if shouldGrow[idx] {
 				// TODO deal with actual weights
-				weights[idx] = 1
+				weights[idx] = desiredSize
 				continue
 			}
 

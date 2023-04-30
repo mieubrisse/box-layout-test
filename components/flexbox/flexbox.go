@@ -108,7 +108,11 @@ func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
 	}
 
 	// Width
-	actualWidthsCalcResults := b.direction.getActualWidths(b.desiredChildWidthsCache, b.children, width)
+	shouldGrowWidths := make([]bool, len(b.children))
+	for idx, item := range b.children {
+		shouldGrowWidths[idx] = item.GetMaxWidth().ShouldGrow()
+	}
+	actualWidthsCalcResults := b.direction.getActualWidths(b.desiredChildWidthsCache, shouldGrowWidths, width)
 
 	// Cache the result, so we don't have to recalculate it in View
 	b.actualChildWidthsCache = actualWidthsCalcResults
@@ -137,7 +141,11 @@ func (b *Flexbox) View(width int, height int) string {
 	actualWidths := b.actualChildWidthsCache.actualSizes
 	// widthNotUsedByChildren := utilities.GetMaxInt(0, width-b.actualChildWidthsCache.spaceUsedByChildren)
 
-	actualHeightsCalcResult := b.direction.getActualHeights(b.desiredChildHeightsGivenWidthCache, b.children, height)
+	shouldGrowHeights := make([]bool, len(b.children))
+	for idx, item := range b.children {
+		shouldGrowHeights[idx] = item.GetMaxHeight().ShouldGrow()
+	}
+	actualHeightsCalcResult := b.direction.getActualHeights(b.desiredChildHeightsGivenWidthCache, shouldGrowHeights, height)
 
 	actualHeights := actualHeightsCalcResult.actualSizes
 	// heightNotUsedByChildren := utilities.GetMaxInt(0, height-actualHeightsCalcResult.spaceUsedByChildren)
