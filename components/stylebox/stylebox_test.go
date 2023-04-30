@@ -54,6 +54,27 @@ func TestPadding(t *testing.T) {
 	)
 }
 
+func TestBorder(t *testing.T) {
+	// Even padding
+	style := lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder())
+	component := New(inner).SetStyle(style)
+
+	assertions := test_assertions.FlattenAssertionGroups(
+		test_assertions.GetContentSizeAssertions(
+			innerMinWidth+style.GetHorizontalBorderSize(),
+			innerMaxWidth+style.GetHorizontalBorderSize(),
+			innerMinHeight+style.GetVerticalBorderSize(),
+			innerMaxHeight+style.GetVerticalBorderSize(),
+		),
+	)
+
+	test_assertions.CheckAll(
+		t,
+		assertions,
+		component,
+	)
+}
+
 func TestColorStylesMaintainSize(t *testing.T) {
 	styles := []lipgloss.Style{
 		lipgloss.NewStyle(),
