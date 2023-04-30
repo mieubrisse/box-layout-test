@@ -62,7 +62,7 @@ func (s styleboxImpl) GetContentMinMax() (minWidth, maxWidth, minHeight, maxHeig
 
 func (s styleboxImpl) GetContentHeightForGivenWidth(width int) int {
 	innerWidth := utilities.GetMaxInt(0, width-s.style.GetHorizontalFrameSize())
-	return s.component.GetContentHeightForGivenWidth(innerWidth)
+	return s.component.GetContentHeightForGivenWidth(innerWidth) + s.style.GetVerticalFrameSize()
 }
 
 func (s styleboxImpl) View(width int, height int) string {

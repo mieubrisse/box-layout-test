@@ -65,6 +65,14 @@ func TestBorder(t *testing.T) {
 			innerMinHeight+style.GetVerticalBorderSize(),
 			innerMaxHeight+style.GetVerticalBorderSize(),
 		),
+		test_assertions.GetHeightAtWidthAssertions(
+			innerMaxWidth+style.GetVerticalBorderSize(),
+			innerMinHeight+style.GetVerticalBorderSize(),
+		),
+		test_assertions.GetHeightAtWidthAssertions(
+			innerMinWidth+style.GetVerticalBorderSize(),
+			innerMaxHeight+style.GetVerticalBorderSize(),
+		),
 	)
 
 	test_assertions.CheckAll(
