@@ -6,13 +6,18 @@ import "github.com/mieubrisse/box-layout-test/components/flexbox_item"
 type Direction interface {
 	// The functions in this interface are used internally in the flexbox to do its calculations
 
-	getMainAxisMaxDimensionValue(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue
+	/*
+		getMainAxisMaxDimensionValue(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue
 
-	getCrossAxisMaxDimensionValue(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue
+		getCrossAxisMaxDimensionValue(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue
 
-	getActualWidths(desiredWidths []int, items []flexbox_item.FlexboxItem) axisCalculationResults
+	*/
 
-	getDesiredHeights(width int, items []flexbox_item.FlexboxItem) []int
+	getActualWidths(desiredWidths []int, items []flexbox_item.FlexboxItem, widthAvailable int) axisSizeCalculationResults
+
+	getActualHeights(desiredHeights []int, items []flexbox_item.FlexboxItem, heightAvailable int) axisSizeCalculationResults
+
+	renderContentFragments(contentFragments []string) string
 }
 
 // Row lays out the flexbox items in a row, left to right
@@ -20,12 +25,8 @@ type Direction interface {
 // Corresponds to "flex-direction: row" in CSS
 func Row() Direction {
 	return &directionImpl{
-		mainAxisMaxDimensionValueGetter: func(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue {
-			return item.GetMaxHeight()
-		},
-		crossAxisMaxDimensionValueGetter: func(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue {
-			return item.GetMaxWidth()
-		},
+		actualWidthCalculator:  calculateActualMainAxisSizes,
+		actualHeightCalculator: calculateActualCrossAxisSizes,
 	}
 }
 
@@ -33,6 +34,10 @@ func Row() Direction {
 // The flex direction will be vertical
 // Corresponds to "flex-direction: column" in CSS
 func Column() Direction {
+	return &directionImpl{
+		actualWidthCalculator:  calculateActualCrossAxisSizes,
+		actualHeightCalculator: calculateActualMainAxisSizes,
+	}
 
 }
 
@@ -43,26 +48,34 @@ func Column() Direction {
 //	Private
 //
 // ====================================================================================================
-type itemDimensionValueGetter func(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue
 type directionImpl struct {
-	mainAxisMaxDimensionValueGetter  itemDimensionValueGetter
-	crossAxisMaxDimensionValueGetter itemDimensionValueGetter
+	actualWidthCalculator  axisSizeCalculator
+	actualHeightCalculator axisSizeCalculator
 }
 
-func (d directionImpl) getMainAxisMaxDimensionValue(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue {
-	return d.mainAxisMaxDimensionValueGetter(item)
+func (r directionImpl) getActualWidths(desiredWidths []int, items []flexbox_item.FlexboxItem, widthAvailable int) axisSizeCalculationResults {
+	return r.actualWidthCalculator(
+		items,
+		desiredWidths,
+		widthAvailable,
+		func(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue {
+			return item.GetMaxWidth()
+		},
+	)
 }
 
-func (d directionImpl) getCrossAxisMaxDimensionValue(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue {
-	return d.crossAxisMaxDimensionValueGetter(item)
+func (r directionImpl) getActualHeights(desiredHeights []int, items []flexbox_item.FlexboxItem, heightAvailable int) axisSizeCalculationResults {
+	return r.actualHeightCalculator(
+		items,
+		desiredHeights,
+		heightAvailable,
+		func(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue {
+			return item.GetMaxHeight()
+		},
+	)
 }
 
-func (d directionImpl) getDesiredWidths(items []flexbox_item.FlexboxItem) []int {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (d directionImpl) getDesiredHeights(width int, items []flexbox_item.FlexboxItem) []int {
+func (r directionImpl) renderContentFragments(contentFragments []string) string {
 	//TODO implement me
 	panic("implement me")
 }

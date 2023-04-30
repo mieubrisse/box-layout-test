@@ -1,17 +1,17 @@
 package flexbox
 
 import (
-	"github.com/mieubrisse/box-layout-test/components"
 	"github.com/mieubrisse/box-layout-test/components/flexbox_item"
 	"github.com/mieubrisse/box-layout-test/utilities"
 )
 
-type axisCalculationResults struct {
+type axisSizeCalculationResults struct {
 	actualSizes []int
 
 	spaceUsedByChildren int
 }
 
+/*
 // Calculates the sizes for children
 func (b Flexbox) calculateMainAxisWidths(widthAvailableForChildren int) calculateChildWidthsResult {
 	numChildren := len(b.children)
@@ -84,19 +84,30 @@ func (b Flexbox) calculateMainAxisWidths(widthAvailableForChildren int) calculat
 	}
 }
 
+*/
+
+type itemDimensionValueGetter func(item flexbox_item.FlexboxItem) flexbox_item.FlexboxItemDimensionValue
+type axisSizeCalculator func(
+	items []flexbox_item.FlexboxItem,
+	desiredSizes []int,
+	spaceAvailable int,
+	maxDimensionValueGetter itemDimensionValueGetter,
+) axisSizeCalculationResults
+
 // TODO move to be a function on the axis?
-func (b Flexbox) calculateActualCrossAxisSizes(
+func calculateActualCrossAxisSizes(
+	items []flexbox_item.FlexboxItem,
 	desiredSizes []int,
 	// How much space is available in the cross axis
 	spaceAvailable int,
 	// How to get the item's desired max value in the cross axis
-	crossAxisMaxValueGetter func(component components.Component) flexbox_item.FlexboxItemDimensionValue,
-) axisCalculationResults {
-	actualSizes := make([]int, len(b.children))
+	crossAxisMaxValueGetter itemDimensionValueGetter,
+) axisSizeCalculationResults {
+	actualSizes := make([]int, len(items))
 
 	// The space used in the cross axis is the max across all children
 	maxSpaceUsed := 0
-	for idx, item := range b.children {
+	for idx, item := range items {
 		actualSize := desiredSizes[idx]
 		if crossAxisMaxValueGetter(item).ShouldGrow() {
 			actualSize = utilities.GetMaxInt(actualSize, spaceAvailable)
@@ -108,17 +119,18 @@ func (b Flexbox) calculateActualCrossAxisSizes(
 		actualSizes[idx] = actualSize
 		maxSpaceUsed = utilities.GetMaxInt(actualSize, maxSpaceUsed)
 	}
-	return axisCalculationResults{
+	return axisSizeCalculationResults{
 		actualSizes:         actualSizes,
 		spaceUsedByChildren: maxSpaceUsed,
 	}
 }
 
-func (b Flexbox) calculateActualMainAxisSizes(
+func calculateActualMainAxisSizes(
+	items []flexbox_item.FlexboxItem,
 	desiredSizes []int,
 	spaceAvailable int,
-	mainAxisValueGetter func(component components.Component) flexbox_item.FlexboxItemDimensionValue,
-) axisCalculationResults {
+	mainAxisValueGetter itemDimensionValueGetter,
+) axisSizeCalculationResults {
 	totalDesiredSize := 0
 	for _, desiredSize := range desiredSizes {
 		totalDesiredSize += desiredSize
@@ -128,8 +140,8 @@ func (b Flexbox) calculateActualMainAxisSizes(
 	freeSpace := spaceAvailable - totalDesiredSize
 	// The "grow" case
 	if freeSpace > 0 {
-		weights := make([]int, len(b.children))
-		for idx, item := range b.children {
+		weights := make([]int, len(items))
+		for idx, item := range items {
 			if mainAxisValueGetter(item).ShouldGrow() {
 				// TODO deal with actual weights
 				weights[idx] = 1
@@ -151,12 +163,13 @@ func (b Flexbox) calculateActualMainAxisSizes(
 		totalSpaceUsed += spaceUsedByChild
 	}
 
-	return axisCalculationResults{
+	return axisSizeCalculationResults{
 		actualSizes:         actualSizes,
 		spaceUsedByChildren: totalSpaceUsed,
 	}
 }
 
+/*
 func (b Flexbox) calculateCrossAxisHeights(childWidths []int, heightAvailable int) ([]int, int) {
 	// TODO cache these results???
 	childHeights := make([]int, len(b.children))
@@ -177,6 +190,7 @@ func (b Flexbox) calculateCrossAxisHeights(childWidths []int, heightAvailable in
 	}
 	return childHeights, maxHeightUsed
 }
+*/
 
 // Distributes the space (which can be negative) across the children, using the weight as a bias for how to allocate
 // The only scenario where no space will be distributed is if there is no total weight

@@ -62,7 +62,7 @@ type Flexbox struct {
 	desiredChildWidthsCache []int
 
 	// The actual widths each child will get (cached between GetContentHeightForGivenWidth and View)
-	actualChildWidthsCache axisCalculationResults
+	actualChildWidthsCache axisSizeCalculationResults
 
 	// The desired height each child wants given its width (cached between GetContentHeightForGivenWidth and View)
 	desiredChildHeightsGivenWidthCache []int
@@ -135,7 +135,7 @@ func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
 	// TODO cache this result!!!!
 
 	// Width
-	actualWidthsCalcResults := b.direction.getActualWidths(b.desiredChildWidthsCache, b.children)
+	actualWidthsCalcResults := b.direction.getActualWidths(b.desiredChildWidthsCache, b.children, width)
 
 	// Cache the result, so we don't have to recalculate it in View
 	b.actualChildWidthsCache = actualWidthsCalcResults
@@ -157,21 +157,19 @@ func (b *Flexbox) GetContentHeightForGivenWidth(width int) int {
 }
 
 func (b *Flexbox) View(width int, height int) string {
-	// Width
-	widthNotUsedByChildren := width - b.actualChildWidthsCache.totalWidthUsed
+	actualWidths := b.actualChildWidthsCache.actualSizes
+	widthNotUsedByChildren := utilities.GetMaxInt(0, width-b.actualChildWidthsCache.spaceUsedByChildren)
 
-	// Height
-	childHeights, maxHeightUsedByChildren := b.calculateCrossAxisHeights(
-		b.actualChildWidthsCache.childWidths,
-		height,
-	)
-	heightNotUsedByChildren := height - maxHeightUsedByChildren
+	actualHeightsCalcResult := b.direction.getActualHeights(b.desiredChildHeightsGivenWidthCache, b.children, height)
 
-	// Now render each child, ensuring we expand the child's string if the resulting string is less
+	actualHeights := actualHeightsCalcResult.actualSizes
+	heightNotUsedByChildren := utilities.GetMaxInt(0, height-actualHeightsCalcResult.spaceUsedByChildren)
+
+	// Now render each child
 	allContentFragments := make([]string, len(b.children))
 	for idx, item := range b.children {
-		childWidth := b.actualChildWidthsCache.childWidths[idx]
-		childHeight := childHeights[idx]
+		childWidth := actualWidths[idx]
+		childHeight := actualHeights[idx]
 		childStr := item.View(childWidth, childHeight)
 
 		allContentFragments[idx] = childStr
@@ -195,8 +193,6 @@ func (b *Flexbox) View(width int, height int) string {
 		newContentFragments = append(newContentFragments, rightPad)
 		allContentFragments = newContentFragments
 	}
-
-	// TODO allow other align types
 
 	// Justify cross axis
 	var content string
