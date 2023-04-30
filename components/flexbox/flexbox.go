@@ -200,15 +200,18 @@ func (b *Flexbox) View(width int, height int) string {
 	}
 
 	// TODO allow other align types
-	content := lipgloss.JoinHorizontal(lipgloss.Top, allContentFragments...)
 
 	// Justify vertically
+	var content string
 	switch b.verticalJustify {
 	case Top:
+		content = lipgloss.JoinHorizontal(lipgloss.Top, allContentFragments...)
 		content += strings.Repeat("\n", heightNotUsedByChildren)
 	case Bottom:
+		content = lipgloss.JoinHorizontal(lipgloss.Bottom, allContentFragments...)
 		content = strings.Repeat("\n", heightNotUsedByChildren) + content
 	case Middle:
+		content = lipgloss.JoinHorizontal(lipgloss.Center, allContentFragments...)
 		topPadSize := heightNotUsedByChildren / 2
 		bottomPadSize := heightNotUsedByChildren - topPadSize
 		topPad := strings.Repeat("\n", topPadSize)
