@@ -10,8 +10,8 @@ type Component interface {
 	// It will give the component's desired height for the given width
 	GetContentHeightForGivenWidth(width int) int
 
-	// TDOO replace result with something that's stylable
 	// The 'width' will be the same width that was passed in to GetContentHeightForGivenWidth, allowing for some caching
 	// of calculation results between the two
+	// TODO maybe return Optional[string], so that we can indicate "there is no content at all"?
 	View(width int, height int) string
 }

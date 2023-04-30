@@ -67,14 +67,11 @@ type flexboxItemImpl struct {
 
 	overflowStyle OverflowStyle
 
-	// Min/maxes of the inner component
-	innerDimensionCache components.DimensionsCache
-
 	// TODO weight (analogous to flex-grow)
 	// When the child size constraint is set to MaxAvailable, then this will be used
 }
 
-func NewItem(component components.Component) FlexboxItem {
+func New(component components.Component) FlexboxItem {
 	return &flexboxItemImpl{
 		component:     component,
 		minWidth:      MinContent,
@@ -95,13 +92,6 @@ func (item *flexboxItemImpl) GetContentMinMax() (minWidth int, maxWidth int, min
 		item,
 	)
 
-	item.innerDimensionCache = components.DimensionsCache{
-		MinWidth:  innerMinWidth,
-		MaxWidth:  innerMaxWidth,
-		MinHeight: innerMinHeight,
-		MaxHeight: innerMaxHeight,
-	}
-
 	return itemMinWidth, itemMaxWidth, itemMinHeight, itemMaxHeight
 }
 
@@ -110,6 +100,10 @@ func (item *flexboxItemImpl) GetContentHeightForGivenWidth(width int) int {
 }
 
 func (item *flexboxItemImpl) View(width int, height int) string {
+	if width == 0 || height == 0 {
+		return ""
+	}
+
 	component := item.GetComponent()
 
 	var widthWhenRendering int
@@ -119,7 +113,8 @@ func (item *flexboxItemImpl) View(width int, height int) string {
 	case Truncate:
 		// If truncating, the child will _think_ they have infinite space available
 		// and then we'll truncate them later
-		widthWhenRendering = item.innerDimensionCache.MaxWidth
+		_, maxWidth, _, _ := component.GetContentMinMax()
+		widthWhenRendering = maxWidth
 	default:
 		panic(fmt.Sprintf("Unknown item overflow style: %v", item.GetOverflowStyle()))
 	}
@@ -128,12 +123,15 @@ func (item *flexboxItemImpl) View(width int, height int) string {
 	result := component.View(widthWhenRendering, height)
 
 	// Truncate, in case the inner item runs over (which will almost definitely be the case when overflowStyle = Truncate)
-	// Also expand, in case the inner item is smaller than what we need
+	result = lipgloss.NewStyle().
+		MaxWidth(width).
+		MaxHeight(height).
+		Render(result)
+
+	// Now expand, in case the inner item is smaller than what we need
 	result = lipgloss.NewStyle().
 		Width(width).
 		Height(height).
-		MaxWidth(width).
-		MaxHeight(height).
 		Render(result)
 
 	return result

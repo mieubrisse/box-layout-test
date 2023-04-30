@@ -31,9 +31,9 @@ func main() {
 			SetTextAlignment(text.AlignCenter)).SetStyle(text3Style)
 
 	yourBox := flexbox.NewWithContents(
-		flexbox_item.NewItem(text1),
-		flexbox_item.NewItem(text2),
-		flexbox_item.NewItem(text3),
+		flexbox_item.New(text1),
+		flexbox_item.New(text2),
+		flexbox_item.New(text3),
 	).SetHorizontalAlignment(flexbox.AlignCenter).
 		SetVerticalAlignment(flexbox.AlignCenter).SetDirection(flexbox.Column)
 

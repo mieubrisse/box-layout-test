@@ -9,11 +9,11 @@ import (
 
 var inner = text.New("\nThis is a\nmultiline string\n\n")
 var innerMinWidth, innerMaxWidth, innerMinHeight, innerMaxHeight = inner.GetContentMinMax()
-var noChangeAssertion = test_assertions.RenderedContentAssertion{
-	Width:           innerMaxWidth,
-	Height:          innerMinHeight,
-	ExpectedContent: inner.View(innerMaxWidth, innerMaxHeight),
-}
+var noChangeAssertion = test_assertions.GetRenderedContentAssertion(
+	innerMaxWidth,
+	innerMinHeight,
+	inner.View(innerMaxWidth, innerMaxHeight),
+)
 
 func TestUnstyled(t *testing.T) {
 	component := New(inner)
@@ -21,7 +21,7 @@ func TestUnstyled(t *testing.T) {
 	assertions := test_assertions.FlattenAssertionGroups(
 		test_assertions.GetDefaultAssertions(),
 		test_assertions.GetContentSizeAssertions(innerMinWidth, innerMaxWidth, innerMinHeight, innerMaxHeight),
-		[]test_assertions.ComponentAssertion{noChangeAssertion},
+		noChangeAssertion,
 	)
 	test_assertions.CheckAll(
 		t,
@@ -92,7 +92,7 @@ func TestColorStylesMaintainSize(t *testing.T) {
 
 	for _, style := range styles {
 		component := New(inner).SetStyle(style)
-		noChangeAssertion.Check(t, component)
+		test_assertions.CheckAll(t, noChangeAssertion, component)
 	}
 }
 
@@ -111,6 +111,6 @@ func TestProhibitedStylesAreRemoved(t *testing.T) {
 
 	for _, style := range prohibitedStyles {
 		component := New(inner).SetStyle(style)
-		noChangeAssertion.Check(t, component)
+		test_assertions.CheckAll(t, noChangeAssertion, component)
 	}
 }

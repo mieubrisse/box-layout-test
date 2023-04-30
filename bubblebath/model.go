@@ -45,7 +45,7 @@ type bubbleBathModel struct {
 func NewBubbleBathModel(app components.Component, options ...BubbleBathOption) tea.Model {
 	// We put the user's app in a box here so that we can get their app auto-resizing with the terminal
 	appBox := flexbox.New().SetChildren([]flexbox_item.FlexboxItem{
-		flexbox_item.NewItem(app).
+		flexbox_item.New(app).
 			// TODO allow these to be configured?
 			SetMinWidth(flexbox_item.MinContent).
 			SetMaxWidth(flexbox_item.MaxAvailable).
