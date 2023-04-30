@@ -16,14 +16,15 @@ func main() {
 		SetBorder(lipgloss.NormalBorder())
 	text2 := flexbox.NewWithContent(text.New("This is text 2"), flexbox_item.WithOverflowStyle(flexbox_item.Truncate)).
 		SetBorder(lipgloss.DoubleBorder())
-	text3 := flexbox.NewWithContent(text.New("This is text 3"), flexbox_item.WithMaxWidth(flexbox_item.MaxAvailableWidth)).
-		SetBorder(lipgloss.BlockBorder())
+	text3 := flexbox.NewWithContent(text.New("This is text 3")).
+		SetBorder(lipgloss.BlockBorder()).
+		SetHorizontalJustify(flexbox.Center)
 
 	yourBox := flexbox.NewWithContents(
 		flexbox_item.NewItem(text1),
 		flexbox_item.NewItem(text2),
-		flexbox_item.NewItem(text3),
-	)
+		flexbox_item.NewItem(text3).SetMinWidth(flexbox_item.FixedSize(20)),
+	).SetHorizontalJustify(flexbox.Center)
 
 	if _, err := bubblebath.RunBubbleBathProgram(
 		yourBox,
