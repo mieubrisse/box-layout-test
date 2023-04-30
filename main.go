@@ -10,6 +10,8 @@ import (
 
 func main() {
 	myApp := app.New()
+	myApp.SetFocus(true)
+
 	if _, err := bubblebath.RunBubbleBathProgram(
 		myApp,
 		nil,

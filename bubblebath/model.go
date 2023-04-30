@@ -84,8 +84,14 @@ func (b *bubbleBathModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return b, nil
 	}
 
-	// return b, b.appComponent.Update(msg)
-	return b, nil
+	// Pass the message down to the app, if it's interactive
+	var cmd tea.Cmd
+	switch app := b.app.(type) {
+	case components.InteractiveComponent:
+		cmd = app.Update(msg)
+	}
+
+	return b, cmd
 }
 
 func (b *bubbleBathModel) View() string {

@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mieubrisse/box-layout-test/app_components/favorite_thing"
 	"github.com/mieubrisse/box-layout-test/app_components/favorite_things_list"
@@ -9,11 +11,15 @@ import (
 )
 
 type App interface {
-	components.Component
+	components.InteractiveComponent
 }
 
 type appImpl struct {
+	favoriteThingsList favorite_things_list.FavoriteThingsList
+
 	root components.Component
+
+	isFocused bool
 }
 
 func New() App {
@@ -23,11 +29,13 @@ func New() App {
 		favorite_thing.New().SetName("Jiu jitsu").SetDescription("Rolling all day"),
 	}
 
-	var root components.Component = favorite_things_list.New().SetThings(myFavoriteThings)
+	favoriteThingsList := favorite_things_list.New().SetThings(myFavoriteThings)
 
-	root = stylebox.New(root).SetStyle(lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()))
+	root := stylebox.New(favoriteThingsList).SetStyle(lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()))
 	return &appImpl{
-		root: root,
+		favoriteThingsList: favoriteThingsList,
+		root:               root,
+		isFocused:          false,
 	}
 }
 
@@ -41,4 +49,36 @@ func (a appImpl) GetContentHeightForGivenWidth(width int) int {
 
 func (a appImpl) View(width int, height int) string {
 	return a.root.View(width, height)
+}
+
+func (a *appImpl) Update(msg tea.Msg) tea.Cmd {
+	if !a.isFocused {
+		return nil
+	}
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "enter" {
+			things := a.favoriteThingsList.GetThings()
+			thingNumber := len(things)
+			newThing := favorite_thing.New().
+				SetName(fmt.Sprintf("Thing #%v", thingNumber)).
+				SetDescription(fmt.Sprintf("This is thing %v", thingNumber))
+			things = append(things, newThing)
+			a.favoriteThingsList.SetThings(things)
+		} else if msg.String() == "backspace" {
+			things := a.favoriteThingsList.GetThings()
+			a.favoriteThingsList.SetThings(things[:len(things)-1])
+		}
+	}
+	return nil
+}
+
+func (a *appImpl) SetFocus(isFocused bool) tea.Cmd {
+	a.isFocused = true
+	return nil
+}
+
+func (a appImpl) IsFocused() bool {
+	return a.isFocused
 }

@@ -11,8 +11,6 @@ import (
 )
 
 type FavoriteThingsList interface {
-	components.Component
-
 	GetThings() []favorite_thing.FavoriteThing
 	SetThings(elems []favorite_thing.FavoriteThing) FavoriteThingsList
 }
